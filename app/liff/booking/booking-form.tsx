@@ -1,13 +1,54 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import liff from "@line/liff";
+import type { Liff } from "@liff/liff-types";
 import { BOOKING_ITEMS, BOOKING_SLOTS } from "@/lib/booking/options";
 import { minBookingDateYmd } from "@/lib/booking/dates";
 
 type Props = { liffId: string };
 
 type Source = { sourceType: "user" | "group" | "room"; sourceId: string };
+
+let liffReady: Promise<Liff> | null = null;
+
+async function loadLiff(liffId: string): Promise<Liff> {
+  if (!liffReady) {
+    liffReady = import("@line/liff")
+      .then(async ({ default: liff }) => {
+        if (!liff.id) {
+          await liff.init({
+            liffId,
+            withLoginOnExternalBrowser: true,
+          });
+        }
+        return liff;
+      })
+      .catch((error) => {
+        liffReady = null;
+        throw error;
+      });
+  }
+  return liffReady;
+}
+
+function formatLiffError(cause: unknown): string {
+  const record = cause as { code?: string; message?: string };
+  const code = record?.code ?? "";
+  const message = record?.message ?? (cause instanceof Error ? cause.message : "");
+  const combined = `${code} ${message}`.toLowerCase();
+
+  if (combined.includes("invalid liff id") || code === "INVALID_LIFF_ID") {
+    return "LIFF ID 無效。請核對 Railway 變數 NEXT_PUBLIC_LINE_LIFF_ID 與 LINE Console 顯示的 ID。";
+  }
+  if (
+    combined.includes("endpoint") ||
+    combined.includes("origin") ||
+    code === "INVALID_CONFIG"
+  ) {
+    return "目前網址與 LIFF Endpoint URL 不一致。請在 LINE Console 設成 https://web-production-1ee6b.up.railway.app/liff/booking";
+  }
+  return `無法啟動 LINE 登入${code ? `（${code}）` : ""}。請從聊天室傳「預約」開啟；若用瀏覽器，請在 LINE Login 的 Callback URL 加入 https://web-production-1ee6b.up.railway.app`;
+}
 
 export function BookingForm({ liffId }: Props) {
   const minDate = useMemo(() => minBookingDateYmd(), []);
@@ -24,6 +65,7 @@ export function BookingForm({ liffId }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [liffClient, setLiffClient] = useState<Liff | null>(null);
 
   useEffect(() => {
     if (!liffId) {
@@ -34,9 +76,14 @@ export function BookingForm({ liffId }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        await liff.init({ liffId });
+        const liff = await loadLiff(liffId);
+        if (cancelled) {
+          return;
+        }
         if (!liff.isLoggedIn()) {
-          liff.login();
+          liff.login({
+            redirectUri: window.location.href.split("#")[0],
+          });
           return;
         }
         const profile = await liff.getProfile();
@@ -44,6 +91,7 @@ export function BookingForm({ liffId }: Props) {
         if (cancelled) {
           return;
         }
+        setLiffClient(liff);
         setDisplayName(profile.displayName);
         setName((current) => current || profile.displayName);
         if (context?.type === "group" && context.groupId) {
@@ -57,7 +105,7 @@ export function BookingForm({ liffId }: Props) {
       } catch (cause) {
         console.error(cause);
         if (!cancelled) {
-          setInitError("無法啟動 LINE 登入，請從官方帳號或群組重新開啟預約頁。");
+          setInitError(formatLiffError(cause));
         }
       }
     })();
@@ -72,7 +120,7 @@ export function BookingForm({ liffId }: Props) {
     setError(null);
     setSubmitting(true);
     try {
-      const idToken = liff.getIDToken();
+      const idToken = liffClient?.getIDToken();
       if (!idToken) {
         throw new Error("缺少登入憑證，請關閉頁面後再試。");
       }

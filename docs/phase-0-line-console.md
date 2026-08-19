@@ -24,9 +24,9 @@ LIFF 掛在 **LINE Login**，不是掛在 Messaging API 的 Secret／Token 上�
 3. 打開該 Login Channel 的 **LINE Login** 分頁：
    - 狀態可先維持 Developing（測試用）。
    - 開啟 **OpenID Connect**（之後驗證 LIFF ID Token 需要 `openid`）。
-   - **Callback URL** 先加：
+   - **Callback URL** 請加入（缺一不可）：
      - `https://liff.line.me`
-     - Railway 網址有了再加：`https://<你的 Railway 網域>`
+     - `https://web-production-1ee6b.up.railway.app`
    - 權限／Scope：至少 **profile**、**openid**。
 4. 若 Console 提供「連結官方帳號」，請連到 **我的自然生活**，讓使用者從 LIFF 可被引導加好友。
 5. Login Channel 另有自己的 **Channel ID** 與 **Channel secret**（和 Messaging API 那組不同）：
