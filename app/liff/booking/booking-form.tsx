@@ -31,26 +31,29 @@ async function loadLiff(liffId: string): Promise<Liff> {
   return liffReady;
 }
 
-function formatLiffError(cause: unknown): string {
+type LiffStage = "init" | "login" | "profile";
+
+function describeCause(cause: unknown): string {
   const record = cause as { code?: string; message?: string };
   const code = record?.code ?? "";
   const message = record?.message ?? (cause instanceof Error ? cause.message : "");
-  const combined = `${code} ${message}`.toLowerCase();
+  return [code, message].filter(Boolean).join(" / ") || String(cause);
+}
 
-  if (combined.includes("invalid liff id") || code === "INVALID_LIFF_ID") {
-    return "LIFF ID 無效。請核對 Railway 變數 NEXT_PUBLIC_LINE_LIFF_ID 與 LINE Console 顯示的 ID。";
+function formatLiffError(stage: LiffStage, cause: unknown): string {
+  const detail = describeCause(cause);
+  const code = (cause as { code?: string })?.code ?? "";
+
+  if (code === "INVALID_LIFF_ID") {
+    return `LIFF ID 無效（${detail}）。請核對 Railway 變數 NEXT_PUBLIC_LINE_LIFF_ID。`;
   }
-  if (
-    combined.includes("endpoint") ||
-    combined.includes("origin") ||
-    code === "INVALID_CONFIG"
-  ) {
-    return "目前網址與 LIFF Endpoint URL 不一致。請在 LINE Console 的 LIFF 分頁（不是 Callback URL）設成 https://web-production-1ee6b.up.railway.app/liff/booking";
+  if (code === "INVALID_CONFIG") {
+    return `LIFF 設定與目前網址不符（${detail}）。請把 LIFF 分頁的 Endpoint URL 設成 https://web-production-1ee6b.up.railway.app/liff/booking`;
   }
-  if (code === "FORBIDDEN") {
-    return "LINE 拒絕此環境或此帳號使用登入（FORBIDDEN）。請用手機 LINE App 在聊天室傳「預約」開啟。若 Login Channel 仍是 Developing，僅 Admin／Tester 且已綁定該開發者帳號的 LINE 才能登入。";
+  if (stage === "init") {
+    return `LIFF 初始化失敗（${detail}）。若為 FORBIDDEN：多為 LIFF 的「Add friend option」需要已連結的官方帳號，或此環境不支援。`;
   }
-  return `無法啟動 LINE 登入${code ? `（${code}）` : ""}${message ? `：${message}` : ""}`;
+  return `LINE 授權步驟失敗（階段：${stage}，${detail}）`;
 }
 
 export function BookingForm({ liffId }: Props) {
@@ -85,38 +88,54 @@ export function BookingForm({ liffId }: Props) {
 
     let cancelled = false;
     (async () => {
+      let liff: Liff;
       try {
-        const liff = await loadLiff(liffId);
-        if (cancelled) {
-          return;
+        liff = await loadLiff(liffId);
+      } catch (cause) {
+        console.error("liff.init failed", cause);
+        if (!cancelled) {
+          setInitError(formatLiffError("init", cause));
         }
+        return;
+      }
+      if (cancelled) {
+        return;
+      }
+
+      try {
         if (!liff.isLoggedIn()) {
-          liff.login({
-            redirectUri: window.location.href.split("#")[0],
-          });
+          liff.login({ redirectUri: window.location.href.split("#")[0] });
           return;
         }
+      } catch (cause) {
+        console.error("liff.login failed", cause);
+        if (!cancelled) {
+          setInitError(formatLiffError("login", cause));
+        }
+        return;
+      }
+
+      const context = liff.getContext();
+      if (context?.type === "group" && context.groupId) {
+        setSource({ sourceType: "group", sourceId: context.groupId });
+      } else if (context?.type === "room" && context.roomId) {
+        setSource({ sourceType: "room", sourceId: context.roomId });
+      }
+
+      try {
         const profile = await liff.getProfile();
-        const context = liff.getContext();
         if (cancelled) {
           return;
         }
-        setLiffClient(liff);
         setDisplayName(profile.displayName);
         setName((current) => current || profile.displayName);
-        if (context?.type === "group" && context.groupId) {
-          setSource({ sourceType: "group", sourceId: context.groupId });
-        } else if (context?.type === "room" && context.roomId) {
-          setSource({ sourceType: "room", sourceId: context.roomId });
-        } else {
-          setSource({ sourceType: "user", sourceId: profile.userId });
-        }
-        setReady(true);
       } catch (cause) {
-        console.error(cause);
-        if (!cancelled) {
-          setInitError(formatLiffError(cause));
-        }
+        console.error("liff.getProfile failed", cause);
+      }
+
+      if (!cancelled) {
+        setLiffClient(liff);
+        setReady(true);
       }
     })();
 
@@ -132,7 +151,9 @@ export function BookingForm({ liffId }: Props) {
     try {
       const idToken = liffClient?.getIDToken();
       if (!idToken) {
-        throw new Error("缺少登入憑證，請關閉頁面後再試。");
+        throw new Error(
+          "取不到登入憑證，請確認 LIFF 的 Scope 已勾選 openid，然後重新開啟此頁。",
+        );
       }
       const response = await fetch("/api/bookings", {
         method: "POST",
