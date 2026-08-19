@@ -1,6 +1,9 @@
 import type { messagingApi, webhook } from "@line/bot-sdk";
+import { parseAdminQuery } from "@/lib/admin/parse";
+import { runAdminTool } from "@/lib/admin/query";
 import { classifyIntent, type Intent } from "@/lib/ai/classify";
 import { answerProductQuestion, answerSmalltalk } from "@/lib/ai/reply";
+import { continueOrderFlow, startOrderFlow } from "@/lib/chat/amend";
 import {
   loadConversation,
   recentHistory,
@@ -8,7 +11,7 @@ import {
   updateConversation,
   type ConversationKind,
 } from "@/lib/chat/conversation";
-import { isLookupMyId, mentionsOrder } from "@/lib/chat/keywords";
+import { isLookupMyId, mentionsNewOrder } from "@/lib/chat/keywords";
 import {
   CLOSING_MESSAGE,
   ORDER_INVITE_MESSAGE,
@@ -16,11 +19,12 @@ import {
   isInCooldown,
 } from "@/lib/chat/policy";
 import { claimWebhookEvent } from "@/lib/line/idempotency";
+import { isAdminLineUser } from "@/lib/line/env";
 import { orderButtonMessage } from "@/lib/line/liff-link";
 import { pushText, replyMessages } from "@/lib/line/messages";
 
 const WELCOME_MESSAGE =
-  "你好，我是「我的自然生活」的客服。我們做手工豆腐乳（原味、辣味）。想訂購請傳「訂購」，我會給你訂購表單；有任何問題也歡迎直接問我。";
+  "你好，我是「我的自然生活」的客服。我們做果酵豆腐乳（原味、辣味）。想訂購請傳「訂購」；要取消或更改訂單也可以直接跟我說。";
 
 type Conversation = { key: string; kind: ConversationKind };
 
@@ -45,7 +49,6 @@ function getConversation(event: webhook.Event): Conversation | null {
   return null;
 }
 
-/** Reply token 可能因為處理較久而失效，此時改用 Push 送到同一個對話。 */
 async function respond(
   replyToken: string,
   conversationKey: string,
@@ -70,6 +73,16 @@ function formatUserIdReply(userId: string | null): string {
   return `你的 LINE userId：\n${userId}`;
 }
 
+async function replyTextAndLog(
+  replyToken: string,
+  conversation: Conversation,
+  text: string,
+  intent: string,
+): Promise<void> {
+  await respond(replyToken, conversation.key, [textMessage(text)]);
+  await recordMessage(conversation.key, "assistant", text, intent);
+}
+
 async function handleOrderIntent(
   replyToken: string,
   conversation: Conversation,
@@ -78,6 +91,7 @@ async function handleOrderIntent(
     smalltalkTurns: 0,
     lastIntent: "order",
     closedAt: null,
+    flowJson: null,
   });
   await respond(replyToken, conversation.key, [
     textMessage(ORDER_INVITE_MESSAGE),
@@ -94,21 +108,55 @@ async function handleTextMessage(
   if (!conversation) {
     return;
   }
+  const speakerId = event.source?.userId ?? null;
 
   if (isLookupMyId(text)) {
     await respond(event.replyToken, conversation.key, [
-      textMessage(formatUserIdReply(event.source?.userId ?? null)),
+      textMessage(formatUserIdReply(speakerId)),
     ]);
     return;
   }
 
   const state = await loadConversation(conversation.key, conversation.kind);
 
-  // 收尾後的冷靜期：只回應明確提到訂購的訊息，其餘保持安靜。
+  const adminAllowed =
+    conversation.kind === "user" && isAdminLineUser(speakerId);
+  if (adminAllowed) {
+    const parsed = await parseAdminQuery(text);
+    if (parsed.action !== "not_admin") {
+      const report = await runAdminTool(parsed);
+      await recordMessage(conversation.key, "user", text, "admin");
+      await replyTextAndLog(event.replyToken, conversation, report, "admin");
+      return;
+    }
+  }
+
+  if (state.flowJson && speakerId) {
+    const continued = await continueOrderFlow(
+      conversation.key,
+      speakerId,
+      text,
+      state.flowJson,
+    );
+    if (continued) {
+      await recordMessage(conversation.key, "user", text, "flow");
+      await replyTextAndLog(event.replyToken, conversation, continued, "flow");
+      return;
+    }
+  }
+
   if (isInCooldown(state.closedAt)) {
-    if (mentionsOrder(text)) {
+    if (mentionsNewOrder(text)) {
       await recordMessage(conversation.key, "user", text, "order");
       await handleOrderIntent(event.replyToken, conversation);
+      return;
+    }
+    const history = await recentHistory(conversation.key);
+    const coolIntent = await classifyIntent(text, history);
+    if ((coolIntent === "cancel" || coolIntent === "amend") && speakerId) {
+      await recordMessage(conversation.key, "user", text, coolIntent);
+      const answer = await startOrderFlow(conversation.key, speakerId, coolIntent);
+      await replyTextAndLog(event.replyToken, conversation, answer, coolIntent);
     }
     return;
   }
@@ -116,6 +164,21 @@ async function handleTextMessage(
   const history = await recentHistory(conversation.key);
   const intent: Intent = await classifyIntent(text, history);
   await recordMessage(conversation.key, "user", text, intent);
+
+  if ((intent === "cancel" || intent === "amend") && speakerId) {
+    const answer = await startOrderFlow(conversation.key, speakerId, intent);
+    await replyTextAndLog(event.replyToken, conversation, answer, intent);
+    return;
+  }
+  if ((intent === "cancel" || intent === "amend") && !speakerId) {
+    await replyTextAndLog(
+      event.replyToken,
+      conversation,
+      "目前認不出是哪一位客人。請在一對一聊天跟我說取消或更改訂購。",
+      intent,
+    );
+    return;
+  }
 
   if (intent === "order") {
     await handleOrderIntent(event.replyToken, conversation);
@@ -125,8 +188,7 @@ async function handleTextMessage(
   if (intent === "product") {
     const answer = await answerProductQuestion(text, history);
     await updateConversation(conversation.key, { lastIntent: "product" });
-    await respond(event.replyToken, conversation.key, [textMessage(answer)]);
-    await recordMessage(conversation.key, "assistant", answer, "product");
+    await replyTextAndLog(event.replyToken, conversation, answer, "product");
     return;
   }
 
@@ -137,8 +199,12 @@ async function handleTextMessage(
       lastIntent: "smalltalk_closed",
       closedAt: new Date(),
     });
-    await respond(event.replyToken, conversation.key, [textMessage(CLOSING_MESSAGE)]);
-    await recordMessage(conversation.key, "assistant", CLOSING_MESSAGE, "smalltalk_closed");
+    await replyTextAndLog(
+      event.replyToken,
+      conversation,
+      CLOSING_MESSAGE,
+      "smalltalk_closed",
+    );
     return;
   }
 
@@ -147,8 +213,7 @@ async function handleTextMessage(
     smalltalkTurns: turnsUsed,
     lastIntent: "smalltalk",
   });
-  await respond(event.replyToken, conversation.key, [textMessage(reply)]);
-  await recordMessage(conversation.key, "assistant", reply, "smalltalk");
+  await replyTextAndLog(event.replyToken, conversation, reply, "smalltalk");
 }
 
 async function handleFollow(

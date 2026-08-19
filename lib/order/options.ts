@@ -10,6 +10,9 @@ export const DELIVERY_MIN_QTY = 6;
 
 export const MAX_QTY_PER_FLAVOR = 999;
 
+/** 與 docs/faq.md 單價同步，供銷售金額試算。 */
+export const PRICE_PER_JAR = 280;
+
 export function isOrderItem(value: string): value is OrderItemValue {
   return ORDER_ITEMS.some((item) => item.value === value);
 }

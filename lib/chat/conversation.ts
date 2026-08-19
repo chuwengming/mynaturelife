@@ -7,6 +7,7 @@ export type ConversationState = {
   key: string;
   smalltalkTurns: number;
   closedAt: Date | null;
+  flowJson: string | null;
 };
 
 const HISTORY_LIMIT = 8;
@@ -18,7 +19,7 @@ export async function loadConversation(
 ): Promise<ConversationState> {
   const prisma = getPrisma();
   if (!prisma) {
-    return { key, smalltalkTurns: 0, closedAt: null };
+    return { key, smalltalkTurns: 0, closedAt: null, flowJson: null };
   }
   try {
     const row = await prisma.conversation.upsert({
@@ -26,10 +27,10 @@ export async function loadConversation(
       update: {},
       create: { key, kind },
     });
-    return { key, smalltalkTurns: row.smalltalkTurns, closedAt: row.closedAt };
+    return { key, smalltalkTurns: row.smalltalkTurns, closedAt: row.closedAt, flowJson: row.flowJson };
   } catch (error) {
     console.error("load conversation failed", error);
-    return { key, smalltalkTurns: 0, closedAt: null };
+    return { key, smalltalkTurns: 0, closedAt: null, flowJson: null };
   }
 }
 
@@ -77,7 +78,7 @@ export async function recordMessage(
 
 export async function updateConversation(
   key: string,
-  data: { smalltalkTurns?: number; lastIntent?: string; closedAt?: Date | null },
+    data: { smalltalkTurns?: number; lastIntent?: string; closedAt?: Date | null; flowJson?: string | null },
 ): Promise<void> {
   const prisma = getPrisma();
   if (!prisma) {

@@ -36,3 +36,10 @@ export function getAdminLineUserIds(): string[] {
     .map((id) => id.trim())
     .filter((id) => /^U[0-9a-f]{32}$/i.test(id));
 }
+
+export function isAdminLineUser(userId: string | null | undefined): boolean {
+  if (!userId) {
+    return false;
+  }
+  return getAdminLineUserIds().some((id) => id.toLowerCase() === userId.toLowerCase());
+}

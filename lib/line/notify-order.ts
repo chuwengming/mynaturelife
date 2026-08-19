@@ -1,6 +1,8 @@
+import type { Order } from "@prisma/client";
 import { getAdminLineUserIds } from "@/lib/line/env";
 import { pushText } from "@/lib/line/messages";
 import { DELIVERY_MIN_QTY, labelForItem } from "@/lib/order/options";
+import { orderYmd } from "@/lib/order/format";
 
 export type OrderNotice = {
   lineUserId: string;
@@ -68,6 +70,40 @@ export async function notifyOrderConfirmed(notice: OrderNotice): Promise<void> {
       await pushText(job.to, job.text);
     } catch (error) {
       console.error("LINE push failed", { toKind: job.to.slice(0, 1), error });
+    }
+  }
+}
+
+export async function notifyOrderChanged(
+  order: Order,
+  kind: "updated" | "cancelled",
+): Promise<void> {
+  const heading =
+    kind === "cancelled"
+      ? `訂單 ${order.id.slice(-6)} 已取消。`
+      : `訂單 ${order.id.slice(-6)} 已更改。`;
+  const notice: OrderNotice = {
+    lineUserId: order.lineUserId,
+    name: order.name,
+    phone: order.phone,
+    orderDate: orderYmd(order),
+    orderItem: order.orderItem,
+    plainQty: order.plainQty,
+    spicyQty: order.spicyQty,
+    address: order.address,
+    notes: order.notes,
+    sourceType: order.sourceType,
+    sourceId: order.sourceId,
+  };
+  const adminText = formatOrder(notice, heading);
+  for (const adminId of getAdminLineUserIds()) {
+    if (adminId === order.lineUserId) {
+      continue;
+    }
+    try {
+      await pushText(adminId, adminText);
+    } catch (error) {
+      console.error("LINE admin notify failed", error);
     }
   }
 }

@@ -128,7 +128,7 @@ Console 沒有「Link LINE account」按鈕，路徑是：右上頭像 → 帳�
 
 重點：**本機 `.env.local` 不會自動同步到 Railway**，兩邊都要填。`DATABASE_URL` 請用服務參照而非貼死字串，MySQL 換密碼時才不會斷。
 
-後續階段會用到（Phase 4，先知道即可）：LLM-Wiki 的 `retrieve` 服務網址與金鑰、網路搜尋 API key。
+後續階段會用到（先知道即可）：沒有。知識庫已改為 `docs/faq.md` + DeepSeek 搜尋。
 
 ---
 
@@ -157,9 +157,12 @@ Console 沒有「Link LINE account」按鈕，路徑是：右上頭像 → 帳�
 3. 1:1 傳任意文字 → Bot 有回覆。
 4. 1:1 傳「我的ID」 → 回傳 `U…`。
 5. 傳「訂購」 → 出現按鈕 → 開啟訂購表單 → 填數量後送出 → 聊天室收到「訂單已成立」。
-6. 傳「豆腐乳怎麼保存？」 → 依 `docs/faq.md` 回答，資料缺就說會請專人回覆。
-7. 連續閒聊 6 句（例如聊天氣）→ 第 6 句收到禮貌收尾；之後 2 小時內閒聊不回，傳「訂購」立刻回表單。
-6. 需要時查 Railway log：`railway logs --service web --deployment --lines 100`。
+6. 傳「豆腐乳怎麼保存？」 → 依 `docs/faq.md` 回答。
+7. 傳「取消訂購」→ 列出本人訂單 → 確定後狀態變為已取消。
+8. 傳「更改訂購」→ 確認訂單 → 說明要改的內容 → 確定後資料庫更新。
+9. 管理員在 **1:1** 傳「請提供上週原味與辣味訂購總量」→ 得到統計；一般使用者傳同樣的話不會查庫。
+10. 連續閒聊 6 句 → 禮貌收尾。
+11. 需要時查 Railway log：`railway logs --service web --deployment --lines 100`。
 
 ---
 
@@ -179,7 +182,7 @@ Console 沒有「Link LINE account」按鈕，路徑是：右上頭像 → 帳�
 | AI 回 200 但內容空白 | DeepSeek V4 思考模式吃掉 `max_tokens` | 請求須帶 `thinking: {"type":"disabled"}`（程式已固定帶上） |
 | AI 回 400 `Prompt must contain the word 'json'` | 用了 json 輸出模式但提示詞沒有 json 字樣 | 提示詞加上「json」 |
 | AI 回答含「TODO」或說要請專人回覆 | `docs/faq.md` 該項還是 TODO | 補上真實資料並 push |
-| 同一句話收到兩次回覆 | 事件重送且去重表失效 | 確認 `DATABASE_URL` 正常、`processed_events` 有資料 |
+| 管理員在群組問銷售數字沒回應報表 | 查庫只允許 1:1 | 請管理員開一對一聊天 |
 
 ---
 

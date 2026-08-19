@@ -31,6 +31,7 @@ model Conversation {
   smalltalkTurns Int           @default(0) @map("smalltalk_turns")
   lastIntent     String?       @map("last_intent")
   closedAt       DateTime?     @map("closed_at")
+  flowJson       String?       @map("flow_json") @db.Text
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
   messages       ChatMessage[]
