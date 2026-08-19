@@ -1,7 +1,8 @@
 import { chatComplete, type AiMessage } from "@/lib/ai/client";
-import { getChatModel, isAiEnabled } from "@/lib/ai/env";
+import { getChatModel, isAiEnabled, isWebSearchEnabled } from "@/lib/ai/env";
 import { loadFaq } from "@/lib/ai/faq";
 import { productSystemPrompt, smalltalkSystemPrompt } from "@/lib/ai/persona";
+import { answerWithWebSearch } from "@/lib/ai/responses";
 import { AI_UNAVAILABLE_MESSAGE, SMALLTALK_TURN_LIMIT } from "@/lib/chat/policy";
 
 const MAX_REPLY_CHARS = 220;
@@ -26,6 +27,7 @@ async function generate(system: string, history: AiMessage[], text: string): Pro
   return trimReply(raw);
 }
 
+/** 先試帶網路搜尋的 /responses；失敗就退回只讀 FAQ 的 /chat/completions。 */
 export async function answerProductQuestion(
   text: string,
   history: AiMessage[],
@@ -33,8 +35,24 @@ export async function answerProductQuestion(
   if (!isAiEnabled()) {
     return AI_UNAVAILABLE_MESSAGE;
   }
+
+  const faq = await loadFaq();
+
+  if (isWebSearchEnabled()) {
+    try {
+      const answer = await answerWithWebSearch({
+        model: getChatModel(),
+        instructions: productSystemPrompt(faq, true),
+        history: history.slice(-8),
+        text,
+      });
+      return trimReply(answer.text);
+    } catch (error) {
+      console.error("web search answer failed, falling back to faq only", error);
+    }
+  }
+
   try {
-    const faq = await loadFaq();
     return await generate(productSystemPrompt(faq), history, text);
   } catch (error) {
     console.error("product answer failed", error);

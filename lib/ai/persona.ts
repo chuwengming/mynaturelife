@@ -7,11 +7,19 @@ export const PERSONA = `你是台灣「我的自然生活」的線上客服，�
 隱私：不要在聊天室裡向客人索取姓名、電話、地址；請引導他在訂購表單填寫。
 訂購方式：請客人傳「訂購」兩個字，系統會給出訂購表單，表單送出訂單即成立。`;
 
-export function productSystemPrompt(faq: string): string {
+const SEARCH_POLICY = `知識來源規則：
+1. 只要是「本店的」資訊（價格、運費、罐重、成分、保存期限、付款、出貨、自取、改單），一律以上面的產品資料為準。產品資料沒寫的，就說「這部分我先幫你確認，稍後請專人回覆你」，**絕對不可以用網路搜尋的結果代替本店規格**。
+2. 只有與本店規格無關的一般知識（例如豆腐乳的傳統吃法、可以怎麼入菜、一般的常溫或冷藏概念、食材常識）可以用網路搜尋補充，回答時要讓客人知道那是一般資訊，本店的細節會再幫他確認。
+3. 不要在回覆裡貼網址或列出來源清單，用自己的話簡短說明就好。`;
+
+export function productSystemPrompt(faq: string, allowSearch = false): string {
   const knowledge = faq
-    ? `以下是唯一可信的產品資料，只能依它回答：\n---\n${faq}\n---`
-    : "目前沒有可用的產品資料，因此任何具體的價格、成分、重量、運費都要說會請專人回覆。";
-  return `${PERSONA}\n\n${knowledge}\n\n回答客人問題後，若情境自然，可以用一句話邀請他訂購。`;
+    ? `以下是本店唯一可信的產品資料：\n---\n${faq}\n---\n資料中標示 TODO 的項目代表尚無資料。`
+    : "目前沒有可用的本店產品資料，因此任何具體的價格、成分、重量、運費都要說會請專人回覆。";
+  const policy = allowSearch
+    ? SEARCH_POLICY
+    : "本店資訊只能依上面的產品資料回答；沒寫的就說會請專人回覆，不可自行推測。";
+  return `${PERSONA}\n\n${knowledge}\n\n${policy}\n\n回答客人問題後，若情境自然，可以用一句話邀請他訂購。`;
 }
 
 export function smalltalkSystemPrompt(turnsUsed: number, turnLimit: number): string {

@@ -21,3 +21,8 @@ export function getClassifyModel(): string {
 export function isAiEnabled(): boolean {
   return Boolean(getAiApiKey());
 }
+
+/** 網路搜尋預設開啟；設 AI_WEB_SEARCH=off 可只用 docs/faq.md 回答。 */
+export function isWebSearchEnabled(): boolean {
+  return (process.env.AI_WEB_SEARCH ?? "on").toLowerCase() !== "off";
+}

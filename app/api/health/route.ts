@@ -14,5 +14,6 @@ export async function GET() {
     hasAdminIds: Boolean(process.env.ADMIN_LINE_USER_IDS),
     hasAiKey: Boolean(process.env.DEEPSEEK_API_KEY ?? process.env.AI_API_KEY),
     aiChatModel: process.env.AI_CHAT_MODEL ?? "deepseek-v4-flash",
+    aiWebSearch: (process.env.AI_WEB_SEARCH ?? "on").toLowerCase() !== "off",
   });
 }

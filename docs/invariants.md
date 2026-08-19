@@ -35,8 +35,11 @@
 - [x] LIFF Endpoint 路徑固定：`/liff/booking`（使用者已確認保留）。正式 URL：`https://web-production-1ee6b.up.railway.app/liff/booking`。**即使功能改名為訂購也不得更動此路徑**，否則 LINE Console 的 LIFF Endpoint 需重設並會出現 `INVALID_CONFIG`。
 - [x] AI 供應商走 **OpenAI 相容協定**，只用三個變數決定：`DEEPSEEK_API_KEY`（或 `AI_API_KEY`）、`AI_BASE_URL`（預設 `https://api.deepseek.com`）、`AI_CHAT_MODEL`／`AI_CLASSIFY_MODEL`（預設 `deepseek-v4-flash`）。換供應商不得改動 `lib/ai/` 以外的程式。
 - [x] 沒有 AI key 時服務仍須正常啟動：訂購與表單完全不受影響，聊天改回固定文案。
-- [x] 產品問答的唯一事實來源是 `docs/faq.md`；標示 `TODO` 的項目視為無資料，AI 必須改口說請專人回覆，不得自行推測價格、成分、運費。
-- [x] 知識庫後期接 LLM-Wiki（先 `index.md` 再讀 2–5 頁），經 `retrieve(question)` 介面；Phase 3 先用 `docs/faq.md` 過渡。
+- [x] **本店資訊**的唯一事實來源是 `docs/faq.md`；標示 `TODO` 的項目視為無資料，AI 必須改口說請專人回覆，不得自行推測價格、成分、運費、出貨。
+- [x] 網路搜尋只用於**與本店規格無關的一般知識**（吃法、料理、食材常識），且回覆須讓客人知道那是一般資訊。搜尋結果**不得**用來回答本店價格、運費、罐重、成分、保存期限、付款與出貨。
+- [x] 搜尋走 DeepSeek `/responses` 端點的伺服器端 `web_search`（`lib/ai/responses.ts`），共用同一把 `DEEPSEEK_API_KEY`，不再引入第三方搜尋服務金鑰。`/chat/completions` 沒有此工具。
+- [x] `/responses` 失敗（400／逾時／模型不支援）時必須自動退回只讀 FAQ 的 `/chat/completions`，不得因搜尋失敗就不回覆。`AI_WEB_SEARCH=off` 可關閉搜尋。
+- [x] **廢棄**：舊計畫「Phase 4 建 LLM-Wiki 知識庫並經 `retrieve(question)` 取用」→ 新做法「不另建知識庫，`docs/faq.md` 加網路搜尋即可」。不得再為此新增知識庫服務或 `retrieve` 介面。
 - [x] 無 `DATABASE_URL` 時 webhook 仍可驗簽與回覆，但**略過去重**（僅本機過渡，正式環境必須有 MySQL）。
 
 ## 4. 資料與設定
@@ -76,6 +79,5 @@
 - [x] 訂購項目選項：豆腐乳(原味) / 豆腐乳(辣味)（值：tofu_curd_plain / tofu_curd_spicy）。
 - [ ] 「訂購項目」與兩個數量欄位語意重疊：目前項目僅作主要品項紀錄，數量以兩個欄位為準，不檢查兩者一致性。若需改為「所選項目數量必須 > 0」請告知。
 - [ ] 單筆數量上限暫定每種口味 999；是否需要更嚴格上限或庫存檢查待確認。
-- [ ] `docs/faq.md` 中的 TODO（單價、罐重、成分、保存期限、運費、付款、出貨時間、自取地點）需由店家提供，否則 AI 一律回「請專人回覆」。
-- [ ] LLM-Wiki 部署位置與 `retrieve` HTTP 契約（將取代 `docs/faq.md`）。
+- [ ] `docs/faq.md` 中的 TODO（單價、罐重、成分、保存期限、運費、付款、出貨時間、自取地點）需由店家提供，否則 AI 一律回「請專人回覆」。店家會陸續補充。
 - [ ] 群組是否收全部訊息，或僅 mention 才處理（依 LINE Console 設定）。目前群組內每則文字訊息都會回覆，若太吵需改為只在被 mention 時回應。

@@ -124,6 +124,7 @@ Console 沒有「Link LINE account」按鈕，路徑是：右上頭像 → 帳�
 | `AI_BASE_URL` | 留空即 `https://api.deepseek.com` | 選配（換供應商才填） |
 | `AI_CHAT_MODEL` | 留空即 `deepseek-v4-flash` | 選配 |
 | `AI_CLASSIFY_MODEL` | 留空即同 `AI_CHAT_MODEL` | 選配（想用更便宜的模型做分類才填） |
+| `AI_WEB_SEARCH` | 留空即 `on`；設 `off` 則只讀 `docs/faq.md` | 選配 |
 
 重點：**本機 `.env.local` 不會自動同步到 Railway**，兩邊都要填。`DATABASE_URL` 請用服務參照而非貼死字串，MySQL 換密碼時才不會斷。
 
@@ -139,8 +140,11 @@ Console 沒有「Link LINE account」按鈕，路徑是：右上頭像 → 帳�
 | 帳戶餘額 | DeepSeek 平台 → 儲值頁面需有餘額 | API 回 402／餘額不足，AI 回覆退回固定文案 |
 | 模型代號 | `deepseek-v4-flash`（程式預設，不必設定） | 填錯會 400 `model not found` |
 | 產品資料 | 專案檔案 `docs/faq.md`，把 `TODO` 換成真實資料後 push | AI 一律回「這部分我先幫你確認，稍後請專人回覆你」，不會亂編價格 |
+| 網路搜尋 | **不需要另一把金鑰**：走 DeepSeek `/responses` 的伺服器端 `web_search`，用同一把 `DEEPSEEK_API_KEY` | 若模型改成不支援 `/responses` 的供應商，搜尋會自動退回只讀 FAQ |
 
-計費提醒：DeepSeek 自 2026-08-16 起分尖峰／離峰計價，V4 Flash 離峰約每百萬 token 輸入 $0.22、輸出 $0.66，尖峰（UTC 01:00–04:00、06:00–10:00，約台灣時間 09:00–12:00、14:00–18:00）加倍。一次客服回覆約 2000 輸入＋200 輸出 token，離峰約台幣 0.02 元。
+計費提醒：DeepSeek 自 2026-08-16 起分尖峰／離峰計價，V4 Flash 離峰約每百萬 token 輸入 $0.22、輸出 $0.66，尖峰（UTC 01:00–04:00、06:00–10:00，約台灣時間 09:00–12:00、14:00–18:00）加倍。一次客服回覆約 2000 輸入＋200 輸出 token，離峰約台幣 0.02 元。有動用網路搜尋時，搜到的內容會併入輸入 token 計費，單次成本大約多幾倍，但仍在角位數台幣分以內。
+
+搜尋只在客人問到與本店規格無關的一般知識時才會觸發（例如豆腐乳怎麼入菜）；問價格、運費、成分一律走 `docs/faq.md`，不會拿網路資料充當本店規格。
 
 金鑰請直接在 Railway 後台或 `railway variables --set` 設定，不要貼進聊天或寫進 repo。
 
