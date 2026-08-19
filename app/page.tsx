@@ -8,7 +8,7 @@ export default function Home() {
         預約與諮詢服務
       </h1>
       <p className="mt-4 max-w-md text-center text-lg leading-8 text-moss/80">
-        請從 LINE 官方帳號或專設群組進入。此頁面是服務狀態入口，預約請使用 LIFF 表單。
+        請從 LINE 官方帳號或專設群組進入。傳「預約」即可開啟表單，送出即成立。
       </p>
       <ul className="mt-10 w-full max-w-md space-y-3 rounded-2xl bg-paper px-6 py-5 text-sm leading-7 shadow-[0_12px_40px_rgba(44,58,46,0.06)]">
         <li>Webhook：<code>/api/line/webhook</code></li>

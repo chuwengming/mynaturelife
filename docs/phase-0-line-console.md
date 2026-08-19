@@ -12,7 +12,7 @@ Messaging API 的 Channel secret、Channel access token 若已填好，下面從
 4. **Messaging API**
    - 發行 **Channel access token（長期）** → `LINE_CHANNEL_ACCESS_TOKEN`
    - 開啟 **Allow bot to join group chats**
-   - Webhook URL 等 Railway 有 HTTPS 後再填：`https://<你的 Railway 網域>/api/line/webhook`
+   - Webhook URL 填：`https://web-production-1ee6b.up.railway.app/api/line/webhook`
 5. [LINE Official Account Manager](https://manager.line.biz/)：測試期建議關掉會跟 Bot 搶答的自動回應；加好友並拉進專設群組。
 
 ## LINE Login（LIFF 的前置，現在就可以做）
@@ -50,10 +50,10 @@ https://<公開網域>/liff/booking
 Railway 正式網域還沒有時，仍可先填一個之後會改的 HTTPS（申請當下通常不檢查網頁是否已上線），例如：
 
 ```
-https://nature-life-bot.up.railway.app/liff/booking
+https://web-production-1ee6b.up.railway.app/liff/booking
 ```
 
-上線後到 LIFF 設定把 Endpoint 改成真正的 `https://<Railway網域>/liff/booking`。**LIFF ID 建立後不會因改 Endpoint 而變。**
+上線後到 LIFF 設定把 Endpoint 改成真正的 `https://web-production-1ee6b.up.railway.app/liff/booking`。**LIFF ID 建立後不會因改 Endpoint 而變。**
 
 1. 進入 **LINE Login Channel**（或已解鎖 LIFF 的那個 Channel）→ **LIFF** 分頁 → **Add**。
 2. 填寫：

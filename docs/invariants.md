@@ -1,7 +1,7 @@
 # Project Invariants（可執行全局契約）
 
 > 隨專案演進持續累積。每條應可被人工或 agent 驗證（可檢查、可回歸）。
-> 最後更新：2026-08-19（補 LINE Login／LIFF ID／管理員 userId）
+> 最後更新：2026-08-19（Phase 2 預約表單送出即成立）
 
 ## 1. 產品流程
 
@@ -14,16 +14,16 @@
 
 - [x] 雙入口共用同一套後端與 `line_user_id`：1:1 回覆／Push 目標為該 `userId`；群組為該 `groupId`。
 - [x] 多使用者並行：每筆預約綁 `line_user_id`，不得使用「目前使用者」全域變數。
-- [x] LIFF 送出時後端須驗證 LINE ID Token，不得信任表單自填的 userId。
-- [ ] Phase 3 起意圖分類由 AI 執行（Phase 1 僅回固定連線成功訊息；傳「我的ID」則回 userId）。
+- [x] LIFF 送出時後端須驗證 LINE ID Token，不得信任表單自填的 userId。`POST /api/bookings` 為唯一寫入點，成功列 `status = confirmed`。
+- [ ] Phase 3 起意圖分類由 AI 執行（Phase 2：傳「預約」回 LIFF 按鈕；傳「我的ID」回 userId；其餘引導去預約）。
 
 ## 3. 環境與銜接（mock / simulation / real）
 
 - [x] Messaging API 金鑰：`LINE_CHANNEL_SECRET`、`LINE_CHANNEL_ACCESS_TOKEN`。LIFF 另需 **LINE Login** Channel：`LINE_LOGIN_CHANNEL_ID`、`LINE_LOGIN_CHANNEL_SECRET`。兩組不可混用。禁止寫死在 repo。
 - [x] `NEXT_PUBLIC_LINE_LIFF_ID` 來自 Login（或已啟用 Login 的）Channel → LIFF 分頁建立 App 後顯示的 LIFF ID。
 - [x] `ADMIN_LINE_USER_IDS` 是管理員的 Messaging API `userId`（`U` 開頭），不是 Channel ID；Phase 1 在 1:1 傳「我的ID」可查詢。
-- [x] Webhook 路徑固定：`POST /api/line/webhook`。
-- [x] LIFF Endpoint 路徑固定：`/liff/booking`。
+- [x] Webhook 路徑固定：`POST /api/line/webhook`。正式 URL：`https://web-production-1ee6b.up.railway.app/api/line/webhook`。
+- [x] LIFF Endpoint 路徑固定：`/liff/booking`。正式 URL：`https://web-production-1ee6b.up.railway.app/liff/booking`。
 - [x] 知識庫後期接 LLM-Wiki（先 `index.md` 再讀 2–5 頁），經 `retrieve(question)` 介面；Phase 1 不呼叫。
 - [x] 無 `DATABASE_URL` 時 webhook 仍可驗簽與回覆，但**略過去重**（僅本機過渡，正式環境必須有 MySQL）。
 
@@ -50,7 +50,7 @@
 
 ## 7. 待確認
 
-- [ ] 預約時段選項文案（暫定：上午／下午／晚上）。
-- [ ] 預約項目選項文案（暫定：生活型態、飲食營養、身心調理、環境與自然、其他）。
+- [x] 預約時段選項：上午／下午／晚上（值：morning / afternoon / evening）。
+- [x] 預約項目選項：生活型態、飲食營養、身心調理、環境與自然、其他。
 - [ ] LLM-Wiki 部署位置與 `retrieve` HTTP 契約。
 - [ ] 群組是否收全部訊息，或僅 mention 才處理（依 LINE Console 設定）。
