@@ -1,6 +1,6 @@
-# 我的自然生活（LINE 預約／諮詢）
+# 我的自然生活（LINE 訂購／諮詢）
 
-Next.js 後端：LINE Messaging API webhook + LIFF 預約頁，部署於 Railway，預約資料存 MySQL。
+Next.js 後端：LINE Messaging API webhook + LIFF 訂購頁，部署於 Railway，訂單資料存 MySQL。
 
 ## 本機
 

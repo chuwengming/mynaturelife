@@ -15,7 +15,7 @@ const sans = Noto_Sans_TC({
 
 export const metadata: Metadata = {
   title: "我的自然生活",
-  description: "LINE 官方帳號預約與諮詢服務",
+  description: "LINE 官方帳號訂購與諮詢服務",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

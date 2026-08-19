@@ -1,11 +1,11 @@
 import type { webhook } from "@line/bot-sdk";
 import { claimWebhookEvent } from "@/lib/line/idempotency";
 import { replyText } from "@/lib/line/client";
-import { bookingButtonMessage } from "@/lib/line/liff-link";
+import { orderButtonMessage } from "@/lib/line/liff-link";
 import { replyMessages } from "@/lib/line/messages";
 
 const FALLBACK_REPLY =
-  "你好，我是「我的自然生活」。\n\n預約請傳「預約」，或點我們寄給你的表單連結。送出即成立。\n一般諮詢回覆會在下一階段開放。\n\n查自己的 LINE userId 請傳：我的ID";
+  "你好，我是「我的自然生活」。\n\n訂購請傳「訂購」，或點我們寄給你的表單連結。送出即成立。\n一般諮詢回覆會在下一階段開放。\n\n查自己的 LINE userId 請傳：我的ID";
 
 function hasReplyToken(
   event: webhook.Event,
@@ -29,8 +29,11 @@ function isLookupMyId(text: string): boolean {
   return normalized === "我的id" || normalized === "/id";
 }
 
-function isBookingRequest(text: string): boolean {
-  return text.includes("預約") && !isLookupMyId(text);
+/** 「預約」保留為舊訊息與舊按鈕的相容關鍵字。 */
+const ORDER_KEYWORDS = ["訂購", "訂單", "預約"];
+
+function isOrderRequest(text: string): boolean {
+  return ORDER_KEYWORDS.some((keyword) => text.includes(keyword)) && !isLookupMyId(text);
 }
 
 export async function handleWebhookEvents(
@@ -52,8 +55,8 @@ export async function handleWebhookEvents(
         await replyText(event.replyToken, formatUserIdReply(getSourceUserId(event)));
         continue;
       }
-      if (text && isBookingRequest(text)) {
-        await replyMessages(event.replyToken, [bookingButtonMessage()]);
+      if (text && isOrderRequest(text)) {
+        await replyMessages(event.replyToken, [orderButtonMessage()]);
         continue;
       }
       await replyText(event.replyToken, FALLBACK_REPLY);

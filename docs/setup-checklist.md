@@ -86,12 +86,14 @@ Console 沒有「Link LINE account」按鈕，路徑是：右上頭像 → 帳�
 |---|---|---|
 | **Endpoint URL** | `https://web-production-1ee6b.up.railway.app/liff/booking` | `INVALID_CONFIG`／頁面無法初始化 |
 | **Size** | Tall 或 Full（目前 `full`） | 版面過小 |
-| **Scope：openid** | 必要 | 拿不到 ID Token，送出預約失敗 |
+| **Scope：openid** | 必要 | 拿不到 ID Token，送出訂單失敗 |
 | **Scope：profile** | 建議勾 | 不勾則 `liff.getProfile()` 回 **`FORBIDDEN`**（無法自動帶入姓名；表單仍可用） |
 | **Add friend option（botPrompt）** | 不需要引導加好友就設 **Off**；設 normal／aggressive 時必須有 Linked OA | `FORBIDDEN`（No bot could be resolved） |
 | LIFF ID | 複製到 `NEXT_PUBLIC_LINE_LIFF_ID` | 頁面顯示未設定 LIFF ID |
 
 目前實測：`scope = ["openid"]`（缺 profile）、`botPrompt = "normal"`、`view.type = full`、Endpoint 正確。
+
+改名為「訂購」後 **不需要改任何 LINE Console 設定**：表單路徑刻意保留 `/liff/booking`，只有頁面文字與 API（`/api/orders`）改名。若日後想改成 `/liff/order`，必須同步改 LIFF Endpoint URL，否則會出現 `INVALID_CONFIG`。
 
 開啟方式：使用者端網址為 `https://liff.line.me/2011165611-aEsHcumH`；請用**手機 LINE App** 從聊天室開啟，不要用 IDE 內嵌預覽（iframe 會被拒）。
 
@@ -131,7 +133,7 @@ Console 沒有「Link LINE account」按鈕，路徑是：右上頭像 → 帳�
 2. LINE Console 按 **Verify** → 成功。
 3. 1:1 傳任意文字 → Bot 有回覆。
 4. 1:1 傳「我的ID」 → 回傳 `U…`。
-5. 傳「預約」 → 出現按鈕 → 開啟表單 → 送出 → 聊天室收到「預約已成立」。
+5. 傳「訂購」 → 出現按鈕 → 開啟訂購表單 → 填數量後送出 → 聊天室收到「訂單已成立」。
 6. 需要時查 Railway log：`railway logs --service web --deployment --lines 100`。
 
 ---
@@ -143,10 +145,10 @@ Console 沒有「Link LINE account」按鈕，路徑是：右上頭像 → 帳�
 | Verify 失敗 | Webhook URL 錯、服務未啟動、Secret 未設 | 查 `/api/health` 與 Railway 部署狀態 |
 | webhook 回 401 | `LINE_CHANNEL_SECRET` 不符 | 重新複製 Secret 到 Railway |
 | LIFF `FORBIDDEN`（init 階段） | Login Channel 為 Developing 而帳號未綁定／非 Admin-Tester；或 botPrompt 非 Off 但沒連 OA；或在 iframe 內開啟 | 綁定 Business ID↔LINE、設 Add friend option 為 Off、用手機 LINE 開啟 |
-| LIFF `FORBIDDEN`（profile 階段） | LIFF Scope 缺 `profile` | 加勾 profile（不加也能預約，只是不自動帶名字） |
+| LIFF `FORBIDDEN`（profile 階段） | LIFF Scope 缺 `profile` | 加勾 profile（不加也能訂購，只是不自動帶名字） |
 | `INVALID_LIFF_ID` | `NEXT_PUBLIC_LINE_LIFF_ID` 錯或未設 | 核對 LIFF 分頁的 ID |
 | `INVALID_CONFIG` | 目前網址與 Endpoint URL 不一致 | 修正 LIFF Endpoint |
-| 送出預約時「取不到登入憑證」 | Scope 缺 `openid` | 加勾 openid |
+| 送出訂單時「取不到登入憑證」 | Scope 缺 `openid` | 加勾 openid |
 | 送出後 503 | `DATABASE_URL` 未設或 MySQL 未啟動 | 檢查 Railway 變數參照與 MySQL 服務 |
 
 ---

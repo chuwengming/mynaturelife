@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Liff } from "@liff/liff-types";
-import { BOOKING_ITEMS, BOOKING_SLOTS } from "@/lib/booking/options";
-import { minBookingDateYmd } from "@/lib/booking/dates";
+import { DELIVERY_MIN_QTY, MAX_QTY_PER_FLAVOR, ORDER_ITEMS } from "@/lib/order/options";
+import { minOrderDateYmd } from "@/lib/order/dates";
+import { formatReasons, parseQty, validateOrder } from "@/lib/order/validate";
 
 type Props = { liffId: string };
 
@@ -56,22 +57,29 @@ function formatLiffError(stage: LiffStage, cause: unknown): string {
   return `LINE 授權步驟失敗（階段：${stage}，${detail}）`;
 }
 
-export function BookingForm({ liffId }: Props) {
-  const minDate = useMemo(() => minBookingDateYmd(), []);
+export function OrderForm({ liffId }: Props) {
+  const minDate = useMemo(() => minOrderDateYmd(), []);
   const [ready, setReady] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [source, setSource] = useState<Source>({ sourceType: "user", sourceId: "" });
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [bookingDate, setBookingDate] = useState(minDate);
-  const [bookingSlot, setBookingSlot] = useState<(typeof BOOKING_SLOTS)[number]["value"]>("morning");
-  const [bookingItem, setBookingItem] = useState<(typeof BOOKING_ITEMS)[number]["value"]>("lifestyle");
+  const [orderDate, setOrderDate] = useState(minDate);
+  const [orderItem, setOrderItem] = useState<(typeof ORDER_ITEMS)[number]["value"]>(
+    ORDER_ITEMS[0].value,
+  );
+  const [plainQty, setPlainQty] = useState("");
+  const [spicyQty, setSpicyQty] = useState("");
+  const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [liffClient, setLiffClient] = useState<Liff | null>(null);
+
+  const totalQty = (parseQty(plainQty) ?? 0) + (parseQty(spicyQty) ?? 0);
+  const needsAddress = totalQty >= DELIVERY_MIN_QTY;
 
   useEffect(() => {
     if (!liffId) {
@@ -81,7 +89,7 @@ export function BookingForm({ liffId }: Props) {
 
     if (window.self !== window.top) {
       setInitError(
-        "請不要用嵌入式預覽開啟。請用手機 LINE App 聊天室傳「預約」，或用獨立瀏覽器分頁開啟。",
+        "請不要用嵌入式預覽開啟。請用手機 LINE App 聊天室傳「訂購」，或用獨立瀏覽器分頁開啟。",
       );
       return;
     }
@@ -147,6 +155,22 @@ export function BookingForm({ liffId }: Props) {
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+
+    const validation = validateOrder({
+      name,
+      phone,
+      orderDate,
+      orderItem,
+      plainQty,
+      spicyQty,
+      address,
+      notes,
+    });
+    if (!validation.ok) {
+      setError(formatReasons(validation.reasons));
+      return;
+    }
+
     setSubmitting(true);
     try {
       const idToken = liffClient?.getIDToken();
@@ -155,16 +179,18 @@ export function BookingForm({ liffId }: Props) {
           "取不到登入憑證，請確認 LIFF 的 Scope 已勾選 openid，然後重新開啟此頁。",
         );
       }
-      const response = await fetch("/api/bookings", {
+      const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           idToken,
           name,
           phone,
-          bookingDate,
-          bookingSlot,
-          bookingItem,
+          orderDate,
+          orderItem,
+          plainQty,
+          spicyQty,
+          address,
           notes,
           sourceType: source.sourceType,
           sourceId: source.sourceId,
@@ -194,9 +220,9 @@ export function BookingForm({ liffId }: Props) {
     return (
       <section className="booking-slip mt-8 px-6 py-8">
         <p className="font-display text-sm tracking-[0.2em] text-clay">已成立</p>
-        <h2 className="mt-2 font-display text-3xl">預約已收下</h2>
+        <h2 className="mt-2 font-display text-3xl">訂單已收下</h2>
         <p className="mt-4 leading-7 text-moss/85">
-          {displayName}，我們會依你選擇的日期與時段聯繫。可關閉此頁回到聊天室。
+          {displayName}，我們會依你填寫的內容與你聯繫。可關閉此頁回到聊天室。
         </p>
       </section>
     );
@@ -204,6 +230,9 @@ export function BookingForm({ liffId }: Props) {
 
   return (
     <form className="booking-slip mt-8 px-6 py-7" onSubmit={onSubmit}>
+      <p className="mb-5 text-sm leading-6 text-clay">
+        * 訂購{DELIVERY_MIN_QTY}罐(含)以上者可以宅配(運費另計)，務必填寫地址
+      </p>
       <label className="block">
         <span className="field-label">姓名</span>
         <input
@@ -227,52 +256,74 @@ export function BookingForm({ liffId }: Props) {
         />
       </label>
       <label className="mt-4 block">
-        <span className="field-label">預約日期</span>
+        <span className="field-label">訂購日期</span>
         <input
           required
           type="date"
           className="field-input"
           min={minDate}
-          value={bookingDate}
-          onChange={(event) => setBookingDate(event.target.value)}
+          value={orderDate}
+          onChange={(event) => setOrderDate(event.target.value)}
         />
       </label>
-      <fieldset className="mt-5">
-        <legend className="field-label">預約時段</legend>
-        <div className="mt-2 grid grid-cols-3 gap-2">
-          {BOOKING_SLOTS.map((slot) => (
-            <label
-              key={slot.value}
-              className={`chip ${bookingSlot === slot.value ? "chip-on" : ""}`}
-            >
-              <input
-                type="radio"
-                className="sr-only"
-                name="bookingSlot"
-                value={slot.value}
-                checked={bookingSlot === slot.value}
-                onChange={() => setBookingSlot(slot.value)}
-              />
-              {slot.label}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      <label className="mt-5 block">
-        <span className="field-label">預約項目</span>
+      <label className="mt-4 block">
+        <span className="field-label">訂購項目</span>
         <select
           className="field-input"
-          value={bookingItem}
+          value={orderItem}
           onChange={(event) =>
-            setBookingItem(event.target.value as (typeof BOOKING_ITEMS)[number]["value"])
+            setOrderItem(event.target.value as (typeof ORDER_ITEMS)[number]["value"])
           }
         >
-          {BOOKING_ITEMS.map((item) => (
+          {ORDER_ITEMS.map((item) => (
             <option key={item.value} value={item.value}>
               {item.label}
             </option>
           ))}
         </select>
+      </label>
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="field-label">原味數量</span>
+          <input
+            type="number"
+            className="field-input"
+            min={0}
+            max={MAX_QTY_PER_FLAVOR}
+            step={1}
+            inputMode="numeric"
+            value={plainQty}
+            onChange={(event) => setPlainQty(event.target.value)}
+            placeholder="0"
+          />
+        </label>
+        <label className="block">
+          <span className="field-label">辣味數量</span>
+          <input
+            type="number"
+            className="field-input"
+            min={0}
+            max={MAX_QTY_PER_FLAVOR}
+            step={1}
+            inputMode="numeric"
+            value={spicyQty}
+            onChange={(event) => setSpicyQty(event.target.value)}
+            placeholder="0"
+          />
+        </label>
+      </div>
+      <label className="mt-4 block">
+        <span className="field-label">
+          地址{needsAddress ? "（宅配必填）" : "（選填）"}
+        </span>
+        <input
+          className="field-input"
+          required={needsAddress}
+          value={address}
+          onChange={(event) => setAddress(event.target.value)}
+          autoComplete="street-address"
+          placeholder="縣市 / 鄉鎮區 / 路街巷弄號樓"
+        />
       </label>
       <label className="mt-4 block">
         <span className="field-label">備註（選填）</span>
@@ -283,9 +334,11 @@ export function BookingForm({ liffId }: Props) {
           maxLength={500}
         />
       </label>
-      {error ? <p className="mt-4 text-sm leading-6 text-clay">{error}</p> : null}
+      {error ? (
+        <p className="mt-4 whitespace-pre-line text-sm leading-6 text-clay">{error}</p>
+      ) : null}
       <button className="submit-seal mt-6" type="submit" disabled={submitting}>
-        {submitting ? "送出中…" : "送出預約"}
+        {submitting ? "送出中…" : "送出訂單"}
       </button>
     </form>
   );

@@ -66,7 +66,7 @@ https://web-production-1ee6b.up.railway.app/liff/booking
 
 ## 如何取得 `ADMIN_LINE_USER_IDS`
 
-這不是 Channel Secret，也不是 LIFF ID。它是**管理員本人的 LINE userId**（Messaging API 的使用者識別，形如 `U` 開頭再加 32 位英數）。用來在使用者 1:1 預約成功時，把通知 Push 給你。
+這不是 Channel Secret，也不是 LIFF ID。它是**管理員本人的 LINE userId**（Messaging API 的使用者識別，形如 `U` 開頭再加 32 位英數）。用來在使用者 1:1 訂單成立時，把通知 Push 給你。
 
 Console **不會**列出所有好友的 userId，請用下面任一方式：
 

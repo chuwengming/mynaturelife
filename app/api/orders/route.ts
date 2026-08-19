@@ -1,24 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
-import {
-  isBookingItem,
-  isBookingSlot,
-} from "@/lib/booking/options";
-import { isYmd, minBookingDateYmd, toDateOnlyUtc } from "@/lib/booking/dates";
-import { notifyBookingConfirmed } from "@/lib/line/notify-booking";
+import { toDateOnlyUtc } from "@/lib/order/dates";
+import { formatReasons, validateOrder, type OrderInput } from "@/lib/order/validate";
+import { notifyOrderConfirmed } from "@/lib/line/notify-order";
 import { verifyLineIdToken } from "@/lib/line/verify-id-token";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-type BookingBody = {
+type OrderBody = OrderInput & {
   idToken?: unknown;
-  name?: unknown;
-  phone?: unknown;
-  bookingDate?: unknown;
-  bookingSlot?: unknown;
-  bookingItem?: unknown;
-  notes?: unknown;
   sourceType?: unknown;
   sourceId?: unknown;
 };
@@ -53,9 +44,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "database unavailable" }, { status: 503 });
   }
 
-  let body: BookingBody;
+  let body: OrderBody;
   try {
-    body = (await request.json()) as BookingBody;
+    body = (await request.json()) as OrderBody;
   } catch {
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
   }
@@ -72,29 +63,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "invalid id token" }, { status: 401 });
   }
 
-  const name = asTrimmedString(body.name);
-  const phone = asTrimmedString(body.phone).replace(/\s+/g, "");
-  const bookingDate = asTrimmedString(body.bookingDate);
-  const bookingSlot = asTrimmedString(body.bookingSlot);
-  const bookingItem = asTrimmedString(body.bookingItem);
-  const notes = asTrimmedString(body.notes) || null;
-  const minDate = minBookingDateYmd();
-
-  if (!name) {
-    return NextResponse.json({ error: "請填寫姓名" }, { status: 400 });
+  const validation = validateOrder(body);
+  if (!validation.ok) {
+    return NextResponse.json(
+      { error: formatReasons(validation.reasons), reasons: validation.reasons },
+      { status: 400 },
+    );
   }
-  if (!/^[\d+\-()]{8,20}$/.test(phone)) {
-    return NextResponse.json({ error: "請填寫有效電話" }, { status: 400 });
-  }
-  if (!isYmd(bookingDate) || bookingDate < minDate) {
-    return NextResponse.json({ error: "請選擇明天以後的預約日期" }, { status: 400 });
-  }
-  if (!isBookingSlot(bookingSlot)) {
-    return NextResponse.json({ error: "請選擇預約時段" }, { status: 400 });
-  }
-  if (!isBookingItem(bookingItem)) {
-    return NextResponse.json({ error: "請選擇預約項目" }, { status: 400 });
-  }
+  const input = validation.order;
 
   const source = parseSource(
     asTrimmedString(body.sourceType),
@@ -105,25 +81,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: source.error }, { status: 400 });
   }
 
-  const booking = await prisma.$transaction(async (tx) => {
+  const order = await prisma.$transaction(async (tx) => {
     await tx.user.upsert({
       where: { lineUserId: identity.lineUserId },
-      update: { displayName: identity.displayName ?? name },
+      update: { displayName: identity.displayName ?? input.name },
       create: {
         lineUserId: identity.lineUserId,
-        displayName: identity.displayName ?? name,
+        displayName: identity.displayName ?? input.name,
       },
     });
 
-    return tx.booking.create({
+    return tx.order.create({
       data: {
         lineUserId: identity.lineUserId,
-        name,
-        phone,
-        bookingDate: toDateOnlyUtc(bookingDate),
-        bookingSlot,
-        bookingItem,
-        notes,
+        name: input.name,
+        phone: input.phone,
+        orderDate: toDateOnlyUtc(input.orderDate),
+        orderItem: input.orderItem,
+        plainQty: input.plainQty,
+        spicyQty: input.spicyQty,
+        address: input.address,
+        notes: input.notes,
         status: "confirmed",
         sourceType: source.sourceType,
         sourceId: source.sourceId,
@@ -131,21 +109,23 @@ export async function POST(request: NextRequest) {
     });
   });
 
-  await notifyBookingConfirmed({
+  await notifyOrderConfirmed({
     lineUserId: identity.lineUserId,
-    name,
-    phone,
-    bookingDate,
-    bookingSlot,
-    bookingItem,
-    notes,
+    name: input.name,
+    phone: input.phone,
+    orderDate: input.orderDate,
+    orderItem: input.orderItem,
+    plainQty: input.plainQty,
+    spicyQty: input.spicyQty,
+    address: input.address,
+    notes: input.notes,
     sourceType: source.sourceType,
     sourceId: source.sourceId,
   });
 
   return NextResponse.json({
     ok: true,
-    bookingId: booking.id,
-    status: booking.status,
+    orderId: order.id,
+    status: order.status,
   });
 }

@@ -15,32 +15,34 @@ model ProcessedEvent {
 }
 
 model User {
-  lineUserId  String    @id @map("line_user_id")
-  displayName String?   @map("display_name")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  bookings    Booking[]
+  lineUserId  String   @id @map("line_user_id")
+  displayName String?  @map("display_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  orders      Order[]
 
   @@map("users")
 }
 
-model Booking {
-  id          String   @id @default(cuid())
-  lineUserId  String   @map("line_user_id")
-  user        User     @relation(fields: [lineUserId], references: [lineUserId])
-  name        String
-  phone       String
-  bookingDate DateTime @map("booking_date") @db.Date
-  bookingSlot String   @map("booking_slot")
-  bookingItem String   @map("booking_item")
-  notes       String?  @db.Text
-  status      String   @default("confirmed")
-  sourceType  String   @map("source_type")
-  sourceId    String   @map("source_id")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+model Order {
+  id         String   @id @default(cuid())
+  lineUserId String   @map("line_user_id")
+  user       User     @relation(fields: [lineUserId], references: [lineUserId])
+  name       String
+  phone      String
+  orderDate  DateTime @map("order_date") @db.Date
+  orderItem  String   @map("order_item")
+  plainQty   Int      @default(0) @map("plain_qty")
+  spicyQty   Int      @default(0) @map("spicy_qty")
+  address    String?  @db.Text
+  notes      String?  @db.Text
+  status     String   @default("confirmed")
+  sourceType String   @map("source_type")
+  sourceId   String   @map("source_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   @@index([lineUserId])
-  @@index([bookingDate])
-  @@map("bookings")
+  @@index([orderDate])
+  @@map("orders")
 }

@@ -1,43 +1,54 @@
 import { getAdminLineUserIds } from "@/lib/line/env";
 import { pushText } from "@/lib/line/messages";
-import { labelForItem, labelForSlot } from "@/lib/booking/options";
+import { DELIVERY_MIN_QTY, labelForItem } from "@/lib/order/options";
 
-export type BookingNotice = {
+export type OrderNotice = {
   lineUserId: string;
   name: string;
   phone: string;
-  bookingDate: string;
-  bookingSlot: string;
-  bookingItem: string;
+  orderDate: string;
+  orderItem: string;
+  plainQty: number;
+  spicyQty: number;
+  address: string | null;
   notes: string | null;
   sourceType: string;
   sourceId: string;
 };
 
-function formatBooking(notice: BookingNotice, heading: string): string {
+function formatOrder(notice: OrderNotice, heading: string): string {
+  const total = notice.plainQty + notice.spicyQty;
   const lines = [
     heading,
     `姓名：${notice.name}`,
     `電話：${notice.phone}`,
-    `預約日期：${notice.bookingDate}`,
-    `預約時段：${labelForSlot(notice.bookingSlot)}`,
-    `預約項目：${labelForItem(notice.bookingItem)}`,
+    `訂購日期：${notice.orderDate}`,
+    `訂購項目：${labelForItem(notice.orderItem)}`,
+    `原味數量：${notice.plainQty}`,
+    `辣味數量：${notice.spicyQty}`,
+    `合計：${total} 罐`,
   ];
+  if (notice.address) {
+    lines.push(`地址：${notice.address}`);
+  }
   if (notice.notes) {
     lines.push(`備註：${notice.notes}`);
+  }
+  if (total >= DELIVERY_MIN_QTY) {
+    lines.push("配送：可宅配（運費另計）");
   }
   lines.push("狀態：已成立");
   return lines.join("\n");
 }
 
-export async function notifyBookingConfirmed(notice: BookingNotice): Promise<void> {
+export async function notifyOrderConfirmed(notice: OrderNotice): Promise<void> {
   const conversationId =
     notice.sourceType === "group" || notice.sourceType === "room"
       ? notice.sourceId
       : notice.lineUserId;
 
-  const userText = formatBooking(notice, "預約已成立，我們會依此時段與你聯繫。");
-  const adminText = formatBooking(notice, "有一筆新預約已成立。");
+  const userText = formatOrder(notice, "訂單已成立，我們會盡快與你聯繫。");
+  const adminText = formatOrder(notice, "有一筆新訂單已成立。");
 
   const jobs: Array<{ to: string; text: string }> = [
     { to: conversationId, text: userText },
