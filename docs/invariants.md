@@ -19,6 +19,8 @@
 
 ## 3. 環境與銜接（mock / simulation / real）
 
+- [x] 外部後台（LINE／Railway）所有必要設定集中於 `docs/setup-checklist.md`，為設定的權威來源；新發現的設定項或錯誤成因須同輪補入。
+
 - [x] Messaging API 金鑰：`LINE_CHANNEL_SECRET`、`LINE_CHANNEL_ACCESS_TOKEN`。LIFF 另需 **LINE Login** Channel：`LINE_LOGIN_CHANNEL_ID`、`LINE_LOGIN_CHANNEL_SECRET`。兩組不可混用。禁止寫死在 repo。
 - [x] `NEXT_PUBLIC_LINE_LIFF_ID` 來自 Login（或已啟用 Login 的）Channel → LIFF 分頁建立 App 後顯示的 LIFF ID。
 - [x] `ADMIN_LINE_USER_IDS` 是管理員的 Messaging API `userId`（`U` 開頭），不是 Channel ID；Phase 1 在 1:1 傳「我的ID」可查詢。

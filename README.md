@@ -29,6 +29,10 @@ npm run dev
 npx prisma migrate dev --name init
 ```
 
+## 設定
+
+LINE、Railway、GitHub 的完整設定清單見 `docs/setup-checklist.md`（含每項漏掉會出現的錯誤）。
+
 ## 契約
 
 行為以 `docs/invariants.md` 為準。
