@@ -59,7 +59,8 @@ https://web-production-1ee6b.up.railway.app/liff/booking
 2. 填寫：
    - Size：**Tall** 或 **Full**
    - Endpoint URL：上面的 `https://…/liff/booking`
-   - Scope：勾 **profile**、**openid**（送出預約時後端要驗 ID Token）。
+   - Scope：**openid** 為必要（後端驗 ID Token 取 userId）；**profile** 用於自動帶入顯示名稱。只勾 openid 時 `liff.getProfile()` 會回 **FORBIDDEN**。
+   - **Add friend option（botPrompt）**：設為 `normal`／`aggressive` 時，Login Channel 必須有 **Linked LINE Official Account**，否則 `liff.init` 可能回 FORBIDDEN。若不需要引導加好友，設為 **Off／none** 最單純。
 3. 建立後，列表／設定頁會顯示 **LIFF ID**，格式類似：`1234567890-AbCdEfGh`。
 4. 這個字串就是 `NEXT_PUBLIC_LINE_LIFF_ID`。對使用者的開啟網址是：`https://liff.line.me/<LIFF_ID>`。
 

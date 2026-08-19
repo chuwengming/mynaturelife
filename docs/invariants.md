@@ -39,6 +39,9 @@
 - [x] Next.js 同時提供 Webhook 與 LIFF 頁。
 - [x] Messaging Secret／Access Token 與 LINE Login Secret 只在 server；僅 `NEXT_PUBLIC_LINE_LIFF_ID` 可進 LIFF 頁。
 - [x] LIFF 在外部瀏覽器以 `withLoginOnExternalBrowser` 初始化；`liff.init` 全程只呼叫一次，避免 React 重複掛載導致失敗。
+- [x] LIFF Scope 只要求 **openid**；`profile` 為選配，`getProfile()` 失敗不得中斷預約表單（顯示名稱僅用於預填）。
+- [x] 1:1 新預約除回使用者外，應 Push 給 `ADMIN_LINE_USER_IDS`（Phase 2）。
+- [x] LIFF 錯誤訊息須標明失敗階段（init／login／profile）與 LINE 原始 code，便於排查。
 
 ## 6. 禁止破壞（含已修回歸）
 
