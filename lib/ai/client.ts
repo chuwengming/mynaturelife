@@ -29,6 +29,9 @@ async function once(options: CompleteOptions): Promise<string> {
         messages: options.messages,
         temperature: options.temperature ?? 0.7,
         max_tokens: options.maxTokens ?? 400,
+        // DeepSeek V4 預設開啟思考模式，思考 token 會吃掉 max_tokens 導致 content 為空。
+        // 客服短回覆與意圖分類都不需要思考。
+        thinking: { type: "disabled" },
         stream: false,
         ...(options.json ? { response_format: { type: "json_object" } } : {}),
       }),

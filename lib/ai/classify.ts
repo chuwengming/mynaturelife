@@ -9,7 +9,7 @@ const SYSTEM = `你是台灣手工豆腐乳賣家「我的自然生活」的訊�
 order：想要訂購、下單、買、詢問怎麼買、要幾罐、要改訂單。
 product：在問產品或交易資訊（成分、口味、價格、運費、宅配、保存方式、出貨時間）。
 smalltalk：寒暄、閒聊、天氣、心情、與產品和訂購無關的話題。
-只輸出 JSON：{"intent":"order|product|smalltalk"}。不要任何說明文字。`;
+只輸出 json 物件：{"intent":"order|product|smalltalk"}。不要任何說明文字。`;
 
 function heuristicIntent(text: string): Intent {
   if (mentionsOrder(text)) {

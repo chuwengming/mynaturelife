@@ -176,6 +176,8 @@ Console 沒有「Link LINE account」按鈕，路徑是：右上頭像 → 帳�
 | 送出訂單時「取不到登入憑證」 | Scope 缺 `openid` | 加勾 openid |
 | 送出後 503 | `DATABASE_URL` 未設或 MySQL 未啟動 | 檢查 Railway 變數參照與 MySQL 服務 |
 | 聊天一律回「系統忙碌了一下」 | `DEEPSEEK_API_KEY` 未設、餘額不足或模型代號錯 | 查 `/api/health` 的 `hasAiKey`，再看 Railway log 的 `AI HTTP` 錯誤碼 |
+| AI 回 200 但內容空白 | DeepSeek V4 思考模式吃掉 `max_tokens` | 請求須帶 `thinking: {"type":"disabled"}`（程式已固定帶上） |
+| AI 回 400 `Prompt must contain the word 'json'` | 用了 json 輸出模式但提示詞沒有 json 字樣 | 提示詞加上「json」 |
 | AI 回答含「TODO」或說要請專人回覆 | `docs/faq.md` 該項還是 TODO | 補上真實資料並 push |
 | 同一句話收到兩次回覆 | 事件重送且去重表失效 | 確認 `DATABASE_URL` 正常、`processed_events` 有資料 |
 

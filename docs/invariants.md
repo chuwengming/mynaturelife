@@ -35,6 +35,8 @@
 - [x] LIFF Endpoint 路徑固定：`/liff/booking`（使用者已確認保留）。正式 URL：`https://web-production-1ee6b.up.railway.app/liff/booking`。**即使功能改名為訂購也不得更動此路徑**，否則 LINE Console 的 LIFF Endpoint 需重設並會出現 `INVALID_CONFIG`。
 - [x] AI 供應商走 **OpenAI 相容協定**，只用三個變數決定：`DEEPSEEK_API_KEY`（或 `AI_API_KEY`）、`AI_BASE_URL`（預設 `https://api.deepseek.com`）、`AI_CHAT_MODEL`／`AI_CLASSIFY_MODEL`（預設 `deepseek-v4-flash`）。換供應商不得改動 `lib/ai/` 以外的程式。
 - [x] 沒有 AI key 時服務仍須正常啟動：訂購與表單完全不受影響，聊天改回固定文案。
+- [x] 呼叫 `/chat/completions` 一律帶 `thinking: {type:"disabled"}`。DeepSeek V4 預設開啟思考模式，思考 token 會吃掉 `max_tokens`，導致 `content` 回空字串（實測分類用 40 token 時必然為空）。
+- [x] 使用 `response_format: json_object` 時提示詞必須包含「json」字樣，否則 DeepSeek 回 400 `invalid_request_error`。
 - [x] **本店資訊**的唯一事實來源是 `docs/faq.md`；標示 `TODO` 的項目視為無資料，AI 必須改口說請專人回覆，不得自行推測價格、成分、運費、出貨。
 - [x] 網路搜尋只用於**與本店規格無關的一般知識**（吃法、料理、食材常識），且回覆須讓客人知道那是一般資訊。搜尋結果**不得**用來回答本店價格、運費、罐重、成分、保存期限、付款與出貨。
 - [x] 搜尋走 DeepSeek `/responses` 端點的伺服器端 `web_search`（`lib/ai/responses.ts`），共用同一把 `DEEPSEEK_API_KEY`，不再引入第三方搜尋服務金鑰。`/chat/completions` 沒有此工具。
