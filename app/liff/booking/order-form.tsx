@@ -314,11 +314,10 @@ export function OrderForm({ liffId }: Props) {
       </div>
       <label className="mt-4 block">
         <span className="field-label">
-          地址{needsAddress ? "（宅配必填）" : "（選填）"}
+          地址（選填{needsAddress ? "，需宅配請填寫" : ""}）
         </span>
         <input
           className="field-input"
-          required={needsAddress}
           value={address}
           onChange={(event) => setAddress(event.target.value)}
           autoComplete="street-address"

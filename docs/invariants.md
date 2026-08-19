@@ -27,7 +27,7 @@
 - [x] `NEXT_PUBLIC_LINE_LIFF_ID` 來自 Login（或已啟用 Login 的）Channel → LIFF 分頁建立 App 後顯示的 LIFF ID。
 - [x] `ADMIN_LINE_USER_IDS` 是管理員的 Messaging API `userId`（`U` 開頭），不是 Channel ID；Phase 1 在 1:1 傳「我的ID」可查詢。
 - [x] Webhook 路徑固定：`POST /api/line/webhook`。正式 URL：`https://web-production-1ee6b.up.railway.app/api/line/webhook`。
-- [x] LIFF Endpoint 路徑固定：`/liff/booking`。正式 URL：`https://web-production-1ee6b.up.railway.app/liff/booking`。**即使改名為訂購也不得更動此路徑**，否則 LINE Console 的 LIFF Endpoint 需重設並會出現 `INVALID_CONFIG`。
+- [x] LIFF Endpoint 路徑固定：`/liff/booking`（使用者已確認保留）。正式 URL：`https://web-production-1ee6b.up.railway.app/liff/booking`。**即使功能改名為訂購也不得更動此路徑**，否則 LINE Console 的 LIFF Endpoint 需重設並會出現 `INVALID_CONFIG`。
 - [x] 知識庫後期接 LLM-Wiki（先 `index.md` 再讀 2–5 頁），經 `retrieve(question)` 介面；Phase 1 不呼叫。
 - [x] 無 `DATABASE_URL` 時 webhook 仍可驗簽與回覆，但**略過去重**（僅本機過渡，正式環境必須有 MySQL）。
 
@@ -57,7 +57,7 @@
 - [x] Reply Token 一次性；長回答改用 Push Message。群組互動 Push 到 groupId，不要只推給個人。
 - [x] 不得把 Channel Secret／Access Token 打進前端 bundle。
 - [x] **訂單成立條件**（任一不符即不得寫入資料庫，並須把原因回饋給使用者）：姓名有值；電話有值且格式有效；訂購項目有值；`原味數量` 與 `辣味數量` 至少一欄為大於 0 的整數。驗證邏輯集中在 `lib/order/validate.ts`，前端與 API 共用同一份。
-- [x] 合計數量 ≥ 6 時地址為必填（源自表單宅配註記）；不足時同樣不建立訂單並說明原因。
+- [x] 地址**一律選填**，任何數量都不得因缺地址而拒絕訂單（6 罐以上是「可以」宅配，不是一定要寄送）。合計 ≥ 6 且未填地址時，僅在管理員通知標註「未填地址」。
 - [x] 驗證失敗時 `POST /api/orders` 回 400 並附中文原因清單，不得產生任何 `orders` 資料列。
 
 ## 7. 待確認

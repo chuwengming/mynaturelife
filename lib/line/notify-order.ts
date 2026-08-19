@@ -35,7 +35,9 @@ function formatOrder(notice: OrderNotice, heading: string): string {
     lines.push(`備註：${notice.notes}`);
   }
   if (total >= DELIVERY_MIN_QTY) {
-    lines.push("配送：可宅配（運費另計）");
+    lines.push(
+      notice.address ? "配送：宅配（運費另計）" : "配送：未填地址，如需宅配請補地址",
+    );
   }
   lines.push("狀態：已成立");
   return lines.join("\n");

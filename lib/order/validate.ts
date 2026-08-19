@@ -1,9 +1,4 @@
-import {
-  DELIVERY_MIN_QTY,
-  MAX_QTY_PER_FLAVOR,
-  isOrderItem,
-  type OrderItemValue,
-} from "@/lib/order/options";
+import { MAX_QTY_PER_FLAVOR, isOrderItem, type OrderItemValue } from "@/lib/order/options";
 import { isYmd, minOrderDateYmd } from "@/lib/order/dates";
 
 export type OrderInput = {
@@ -90,10 +85,8 @@ export function validateOrder(input: OrderInput): OrderValidation {
     reasons.push("訂購日期不可早於今天。");
   }
 
+  // 地址一律選填：6 罐以上「可以」宅配，不代表使用者一定要寄送。
   const totalQty = (plainQty ?? 0) + (spicyQty ?? 0);
-  if (totalQty >= DELIVERY_MIN_QTY && !address) {
-    reasons.push(`訂購 ${DELIVERY_MIN_QTY} 罐(含)以上可宅配，請填寫地址。`);
-  }
 
   if (reasons.length > 0) {
     return { ok: false, reasons };
