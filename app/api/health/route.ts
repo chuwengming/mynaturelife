@@ -12,5 +12,7 @@ export async function GET() {
     hasLiffId: Boolean(process.env.NEXT_PUBLIC_LINE_LIFF_ID ?? process.env.LINE_LIFF_ID),
     hasLoginChannelId: Boolean(process.env.LINE_LOGIN_CHANNEL_ID),
     hasAdminIds: Boolean(process.env.ADMIN_LINE_USER_IDS),
+    hasAiKey: Boolean(process.env.DEEPSEEK_API_KEY ?? process.env.AI_API_KEY),
+    aiChatModel: process.env.AI_CHAT_MODEL ?? "deepseek-v4-flash",
   });
 }

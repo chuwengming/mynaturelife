@@ -120,10 +120,29 @@ Console 沒有「Link LINE account」按鈕，路徑是：右上頭像 → 帳�
 | `NEXT_PUBLIC_LINE_LIFF_ID` | Login Channel → LIFF 分頁 | 必要 |
 | `DATABASE_URL` | 設為參照 `${{MySQL.MYSQL_URL}}` | 必要 |
 | `ADMIN_LINE_USER_IDS` | 在 1:1 傳「我的ID」取得 | 選配（管理員通知） |
+| `DEEPSEEK_API_KEY` | DeepSeek 平台 → API keys | 必要（Phase 3 AI 對話） |
+| `AI_BASE_URL` | 留空即 `https://api.deepseek.com` | 選配（換供應商才填） |
+| `AI_CHAT_MODEL` | 留空即 `deepseek-v4-flash` | 選配 |
+| `AI_CLASSIFY_MODEL` | 留空即同 `AI_CHAT_MODEL` | 選配（想用更便宜的模型做分類才填） |
 
 重點：**本機 `.env.local` 不會自動同步到 Railway**，兩邊都要填。`DATABASE_URL` 請用服務參照而非貼死字串，MySQL 換密碼時才不會斷。
 
-後續階段會用到（Phase 3–4，先知道即可）：AI 供應商 API key、LLM-Wiki 的 `retrieve` 服務網址與金鑰、網路搜尋 API key。
+後續階段會用到（Phase 4，先知道即可）：LLM-Wiki 的 `retrieve` 服務網址與金鑰、網路搜尋 API key。
+
+---
+
+## 5.1 AI 對話（Phase 3，DeepSeek）
+
+| 設定 | 位置路徑 → 要求值 | 漏掉的後果 |
+|---|---|---|
+| API key | DeepSeek 平台 → API keys → 建立 → 貼到 Railway `web` 服務的 `DEEPSEEK_API_KEY` | 客人問產品或閒聊時只會收到「系統忙碌」固定文案；訂購與表單不受影響 |
+| 帳戶餘額 | DeepSeek 平台 → 儲值頁面需有餘額 | API 回 402／餘額不足，AI 回覆退回固定文案 |
+| 模型代號 | `deepseek-v4-flash`（程式預設，不必設定） | 填錯會 400 `model not found` |
+| 產品資料 | 專案檔案 `docs/faq.md`，把 `TODO` 換成真實資料後 push | AI 一律回「這部分我先幫你確認，稍後請專人回覆你」，不會亂編價格 |
+
+計費提醒：DeepSeek 自 2026-08-16 起分尖峰／離峰計價，V4 Flash 離峰約每百萬 token 輸入 $0.22、輸出 $0.66，尖峰（UTC 01:00–04:00、06:00–10:00，約台灣時間 09:00–12:00、14:00–18:00）加倍。一次客服回覆約 2000 輸入＋200 輸出 token，離峰約台幣 0.02 元。
+
+金鑰請直接在 Railway 後台或 `railway variables --set` 設定，不要貼進聊天或寫進 repo。
 
 ---
 
@@ -134,6 +153,8 @@ Console 沒有「Link LINE account」按鈕，路徑是：右上頭像 → 帳�
 3. 1:1 傳任意文字 → Bot 有回覆。
 4. 1:1 傳「我的ID」 → 回傳 `U…`。
 5. 傳「訂購」 → 出現按鈕 → 開啟訂購表單 → 填數量後送出 → 聊天室收到「訂單已成立」。
+6. 傳「豆腐乳怎麼保存？」 → 依 `docs/faq.md` 回答，資料缺就說會請專人回覆。
+7. 連續閒聊 6 句（例如聊天氣）→ 第 6 句收到禮貌收尾；之後 2 小時內閒聊不回，傳「訂購」立刻回表單。
 6. 需要時查 Railway log：`railway logs --service web --deployment --lines 100`。
 
 ---
@@ -150,6 +171,9 @@ Console 沒有「Link LINE account」按鈕，路徑是：右上頭像 → 帳�
 | `INVALID_CONFIG` | 目前網址與 Endpoint URL 不一致 | 修正 LIFF Endpoint |
 | 送出訂單時「取不到登入憑證」 | Scope 缺 `openid` | 加勾 openid |
 | 送出後 503 | `DATABASE_URL` 未設或 MySQL 未啟動 | 檢查 Railway 變數參照與 MySQL 服務 |
+| 聊天一律回「系統忙碌了一下」 | `DEEPSEEK_API_KEY` 未設、餘額不足或模型代號錯 | 查 `/api/health` 的 `hasAiKey`，再看 Railway log 的 `AI HTTP` 錯誤碼 |
+| AI 回答含「TODO」或說要請專人回覆 | `docs/faq.md` 該項還是 TODO | 補上真實資料並 push |
+| 同一句話收到兩次回覆 | 事件重送且去重表失效 | 確認 `DATABASE_URL` 正常、`processed_events` 有資料 |
 
 ---
 

@@ -24,6 +24,33 @@ model User {
   @@map("users")
 }
 
+/// 一個對話串：1:1 用 userId，群組用 groupId，多人聊天室用 roomId。
+model Conversation {
+  key            String        @id @map("conversation_key")
+  kind           String
+  smalltalkTurns Int           @default(0) @map("smalltalk_turns")
+  lastIntent     String?       @map("last_intent")
+  closedAt       DateTime?     @map("closed_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  messages       ChatMessage[]
+
+  @@map("conversations")
+}
+
+model ChatMessage {
+  id              String       @id @default(cuid())
+  conversationKey String       @map("conversation_key")
+  conversation    Conversation @relation(fields: [conversationKey], references: [key], onDelete: Cascade)
+  role            String
+  content         String       @db.Text
+  intent          String?
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  @@index([conversationKey, createdAt])
+  @@map("chat_messages")
+}
+
 model Order {
   id         String   @id @default(cuid())
   lineUserId String   @map("line_user_id")
