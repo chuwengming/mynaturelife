@@ -22,7 +22,7 @@ LIFF 掛在 **LINE Login**，不是掛在 Messaging API 的 Secret／Token 上�
 1. 同一 Provider → **Create a new channel** → 選 **LINE Login**（名稱可用「我的自然生活 Login」）。
 2. 應用類型選 **Web app**。
 3. 打開該 Login Channel 的 **LINE Login** 分頁：
-   - 狀態可先維持 Developing（測試用）。
+   - 狀態可先維持 Developing（測試用）。Developing 時**只有 Admin／Tester 且 LINE 帳號已綁定該開發者**才能登入；一般好友會得到 FORBIDDEN。要給所有使用者預約，需把 LINE Login Channel 改為 **Published**（發布後不能改回 Developing）。
    - 開啟 **OpenID Connect**（之後驗證 LIFF ID Token 需要 `openid`）。
    - **Callback URL** 請加入（缺一不可）：
      - `https://liff.line.me`

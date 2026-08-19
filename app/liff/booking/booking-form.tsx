@@ -45,9 +45,12 @@ function formatLiffError(cause: unknown): string {
     combined.includes("origin") ||
     code === "INVALID_CONFIG"
   ) {
-    return "目前網址與 LIFF Endpoint URL 不一致。請在 LINE Console 設成 https://web-production-1ee6b.up.railway.app/liff/booking";
+    return "目前網址與 LIFF Endpoint URL 不一致。請在 LINE Console 的 LIFF 分頁（不是 Callback URL）設成 https://web-production-1ee6b.up.railway.app/liff/booking";
   }
-  return `無法啟動 LINE 登入${code ? `（${code}）` : ""}。請從聊天室傳「預約」開啟；若用瀏覽器，請在 LINE Login 的 Callback URL 加入 https://web-production-1ee6b.up.railway.app`;
+  if (code === "FORBIDDEN") {
+    return "LINE 拒絕此環境或此帳號使用登入（FORBIDDEN）。請用手機 LINE App 在聊天室傳「預約」開啟。若 Login Channel 仍是 Developing，僅 Admin／Tester 且已綁定該開發者帳號的 LINE 才能登入。";
+  }
+  return `無法啟動 LINE 登入${code ? `（${code}）` : ""}${message ? `：${message}` : ""}`;
 }
 
 export function BookingForm({ liffId }: Props) {
@@ -70,6 +73,13 @@ export function BookingForm({ liffId }: Props) {
   useEffect(() => {
     if (!liffId) {
       setInitError("尚未設定 LIFF ID。");
+      return;
+    }
+
+    if (window.self !== window.top) {
+      setInitError(
+        "請不要用嵌入式預覽開啟。請用手機 LINE App 聊天室傳「預約」，或用獨立瀏覽器分頁開啟。",
+      );
       return;
     }
 
