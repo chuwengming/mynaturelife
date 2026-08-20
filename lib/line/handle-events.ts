@@ -21,7 +21,8 @@ import {
 import { claimWebhookEvent } from "@/lib/line/idempotency";
 import { isAdminLineUser } from "@/lib/line/env";
 import { orderButtonMessage } from "@/lib/line/liff-link";
-import { pushText, replyMessages } from "@/lib/line/messages";
+import { pushMessages, replyMessages } from "@/lib/line/messages";
+import { pruneRetention } from "@/lib/db/retention";
 
 const WELCOME_MESSAGE =
   "你好，我是「我的自然生活」的客服。我們做果酵豆腐乳（原味、辣味）。想訂購請傳「訂購」；要取消或更改訂單也可以直接跟我說。";
@@ -58,11 +59,7 @@ async function respond(
     await replyMessages(replyToken, messages);
   } catch (error) {
     console.error("reply failed, falling back to push", error);
-    for (const message of messages) {
-      if (message.type === "text") {
-        await pushText(conversationKey, message.text);
-      }
-    }
+    await pushMessages(conversationKey, messages);
   }
 }
 
@@ -111,6 +108,12 @@ async function handleTextMessage(
   const speakerId = event.source?.userId ?? null;
 
   if (isLookupMyId(text)) {
+    if (conversation.kind !== "user") {
+      await respond(event.replyToken, conversation.key, [
+        textMessage("查詢 userId 請先把「我的自然生活」加為好友，再在一對一聊天傳：我的ID"),
+      ]);
+      return;
+    }
     await respond(event.replyToken, conversation.key, [
       textMessage(formatUserIdReply(speakerId)),
     ]);
@@ -138,9 +141,12 @@ async function handleTextMessage(
       text,
       state.flowJson,
     );
-    if (continued) {
+    if (continued.action === "ignore") {
+      return;
+    }
+    if (continued.action === "reply") {
       await recordMessage(conversation.key, "user", text, "flow");
-      await replyTextAndLog(event.replyToken, conversation, continued, "flow");
+      await replyTextAndLog(event.replyToken, conversation, continued.text, "flow");
       return;
     }
   }
@@ -234,16 +240,16 @@ function hasReplyToken<T extends webhook.Event>(
 
 export async function handleWebhookEvents(events: webhook.Event[]): Promise<void> {
   for (const event of events) {
-    const claimed = await claimWebhookEvent(event.webhookEventId);
-    if (!claimed) {
-      continue;
-    }
-
-    if (!hasReplyToken(event)) {
-      continue;
-    }
-
     try {
+      const claimed = await claimWebhookEvent(event.webhookEventId);
+      if (!claimed) {
+        continue;
+      }
+
+      if (!hasReplyToken(event)) {
+        continue;
+      }
+
       if (event.type === "follow") {
         await handleFollow(event);
         continue;
@@ -260,5 +266,11 @@ export async function handleWebhookEvents(events: webhook.Event[]): Promise<void
         error,
       });
     }
+  }
+
+  try {
+    await pruneRetention();
+  } catch (error) {
+    console.error("retention prune failed", error);
   }
 }

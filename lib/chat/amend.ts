@@ -81,15 +81,28 @@ async function startKind(
   if (orders.length === 1) {
     const order = orders[0];
     if (kind === "cancel") {
-      await setFlow(conversationKey, { kind: "cancel", step: "confirm", orderId: order.id }, "cancel");
+      await setFlow(
+        conversationKey,
+        { speakerId: lineUserId, kind: "cancel", step: "confirm", orderId: order.id },
+        "cancel",
+      );
       return `請確認是否取消這一筆：\n\n${formatOrderCard(order)}\n\n確定取消請回「確定」；要保留請回「不用了」。`;
     }
-    await setFlow(conversationKey, { kind: "amend", step: "change", orderId: order.id }, "amend");
+    await setFlow(
+      conversationKey,
+      { speakerId: lineUserId, kind: "amend", step: "change", orderId: order.id },
+      "amend",
+    );
     return `目前這一筆訂單如下：\n\n${formatOrderCard(order)}\n\n請告訴我要改哪些內容（例如：原味改成 2 罐、地址改為……）。若不用改，請回「不用了」。`;
   }
   await setFlow(
     conversationKey,
-    { kind, step: "pick", orderIds: orders.map((order) => order.id) },
+    {
+      speakerId: lineUserId,
+      kind,
+      step: "pick",
+      orderIds: orders.map((order) => order.id),
+    },
     kind,
   );
   return listText(orders, kind);
@@ -111,10 +124,18 @@ async function pickOrder(
     return "找不到這一筆訂單，可能已取消。請再說一次「取消訂購」或「更改訂購」。";
   }
   if (flow.kind === "cancel") {
-    await setFlow(conversationKey, { kind: "cancel", step: "confirm", orderId: order.id }, "cancel");
+    await setFlow(
+      conversationKey,
+      { speakerId: lineUserId, kind: "cancel", step: "confirm", orderId: order.id },
+      "cancel",
+    );
     return `請確認是否取消：\n\n${formatOrderCard(order)}\n\n確定請回「確定」；要保留請回「不用了」。`;
   }
-  await setFlow(conversationKey, { kind: "amend", step: "change", orderId: order.id }, "amend");
+  await setFlow(
+    conversationKey,
+    { speakerId: lineUserId, kind: "amend", step: "change", orderId: order.id },
+    "amend",
+  );
   return `要改的是這一筆：\n\n${formatOrderCard(order)}\n\n請說明要改的內容。`;
 }
 
@@ -166,7 +187,13 @@ async function collectPatch(
   }
   await setFlow(
     conversationKey,
-    { kind: "amend", step: "confirm", orderId, patch: patch as Record<string, unknown> },
+    {
+      speakerId: lineUserId,
+      kind: "amend",
+      step: "confirm",
+      orderId,
+      patch: patch as Record<string, unknown>,
+    },
     "amend",
   );
   return `將做這些更改：\n${describePatch(patch)}\n\n確定請回「確定」；要重說請直接再傳一次更改內容；放棄請回「不用了」。`;
@@ -226,38 +253,58 @@ export async function startOrderFlow(
   return startKind(conversationKey, lineUserId, kind);
 }
 
+export type FlowContinue =
+  | { action: "reply"; text: string }
+  | { action: "passthrough" }
+  | { action: "ignore" };
+
 export async function continueOrderFlow(
   conversationKey: string,
   lineUserId: string,
   text: string,
   flowJson: string | null,
-): Promise<string | null> {
+): Promise<FlowContinue> {
   const flow = parseFlowJson(flowJson);
   if (!flow) {
-    return null;
+    return { action: "passthrough" };
+  }
+  if (flow.speakerId !== lineUserId) {
+    if (mentionsNewOrder(text) || mentionsCancel(text) || mentionsAmend(text)) {
+      return { action: "passthrough" };
+    }
+    return { action: "ignore" };
   }
   if (mentionsAbortFlow(text)) {
     await setFlow(conversationKey, null, "flow_aborted");
-    return ABORTED;
+    return { action: "reply", text: ABORTED };
   }
   if (mentionsNewOrder(text)) {
     await setFlow(conversationKey, null, "flow_aborted");
-    return null;
+    return { action: "passthrough" };
   }
   if (mentionsCancel(text) && flow.kind === "amend") {
-    return startKind(conversationKey, lineUserId, "cancel");
+    return { action: "reply", text: await startKind(conversationKey, lineUserId, "cancel") };
   }
   if (flow.step === "pick") {
-    return pickOrder(conversationKey, lineUserId, text, flow);
+    return { action: "reply", text: await pickOrder(conversationKey, lineUserId, text, flow) };
   }
   if (flow.kind === "cancel" && flow.step === "confirm") {
-    return confirmCancel(conversationKey, lineUserId, text, flow.orderId);
+    return {
+      action: "reply",
+      text: await confirmCancel(conversationKey, lineUserId, text, flow.orderId),
+    };
   }
   if (flow.kind === "amend" && flow.step === "change") {
-    return collectPatch(conversationKey, lineUserId, text, flow.orderId);
+    return {
+      action: "reply",
+      text: await collectPatch(conversationKey, lineUserId, text, flow.orderId),
+    };
   }
   if (flow.kind === "amend" && flow.step === "confirm") {
-    return confirmAmend(conversationKey, lineUserId, text, flow.orderId, flow.patch);
+    return {
+      action: "reply",
+      text: await confirmAmend(conversationKey, lineUserId, text, flow.orderId, flow.patch),
+    };
   }
-  return null;
+  return { action: "passthrough" };
 }

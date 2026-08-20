@@ -53,7 +53,7 @@ LIFF ID 的數字段必須等於 Login Channel ID；不相等表示 LIFF 建在�
 | 關鍵字回應 | **關閉**（測試期） | 同上 |
 | 加入群組 | 已把官方帳號拉進專設群組 | 群組入口需要 |
 
-目前實測：`chatMode = chat`。若日後 Bot 回覆變得不穩定或被罐頭訊息蓋過，先來看這一項。
+目前實測：`chatMode = chat`。**建議改成 Bot**，並關閉自動回應／關鍵字回應，否則官方帳號「聊天」模式可能與本專案 Bot 搶答。漏改的後果：客人同時收到罐頭訊息與 Bot 回覆，或 Bot 看起來沒反應。
 
 ---
 
@@ -67,7 +67,8 @@ LIFF **掛在 LINE Login**，不是掛在 Messaging API。兩者必須在**同�
 | **OpenID Connect** | 開啟 | 拿不到 ID Token，後端無法驗身份 |
 | **Callback URL** | `https://liff.line.me`<br>`https://web-production-1ee6b.up.railway.app` | 外部瀏覽器登入被擋 |
 | **Linked LINE Official Account** | 連到「我的自然生活」 | LIFF 的 Add friend option 非 Off 時，`liff.init` 可能回 `FORBIDDEN` |
-| Channel ID / Channel secret | `LINE_LOGIN_CHANNEL_ID` / `LINE_LOGIN_CHANNEL_SECRET` | 後端無法驗 ID Token |
+| Channel ID | `LINE_LOGIN_CHANNEL_ID`（驗 ID Token 必填） | 後端無法驗身份，LIFF 送出 401 |
+| Channel secret | `LINE_LOGIN_CHANNEL_SECRET`（可存；**目前程式不拿它驗 ID Token**） | 漏了不影響現有訂購；日後若接 Login 伺服器流程才需要 |
 | **狀態 Developing / Published** | 自己測 → Developing 即可；開放給客人 → **Published** | Developing 時只有 Admin／Tester 且**已綁定 LINE 帳號**的人能登入，其他人 `FORBIDDEN`。Published 後**不能改回** |
 | Roles | 自己為 Admin 或 Tester | 同上 |
 
@@ -116,10 +117,10 @@ Console 沒有「Link LINE account」按鈕，路徑是：右上頭像 → 帳�
 | `LINE_CHANNEL_SECRET` | Messaging API → Basic settings | 必要 |
 | `LINE_CHANNEL_ACCESS_TOKEN` | Messaging API → 長期 token | 必要 |
 | `LINE_LOGIN_CHANNEL_ID` | Login Channel → Basic settings | 必要（驗 ID Token） |
-| `LINE_LOGIN_CHANNEL_SECRET` | Login Channel → Basic settings | 必要 |
+| `LINE_LOGIN_CHANNEL_SECRET` | Login Channel → Basic settings | 選配（現行程式驗 ID Token 只用 Channel ID） |
 | `NEXT_PUBLIC_LINE_LIFF_ID` | Login Channel → LIFF 分頁 | 必要 |
 | `DATABASE_URL` | 設為參照 `${{MySQL.MYSQL_URL}}` | 必要 |
-| `ADMIN_LINE_USER_IDS` | 在 1:1 傳「我的ID」取得 | 選配（管理員通知） |
+| `ADMIN_LINE_USER_IDS` | 每位管理員在 1:1 傳「我的ID」取得，逗號串接，寫入 Railway `web` | 必要（新訂單／改單／取消通知，以及自然語言查庫）。漏掉該人：他問銷售數字不會查庫；也不會收到訂單 Push |
 | `DEEPSEEK_API_KEY` | DeepSeek 平台 → API keys | 必要（Phase 3 AI 對話） |
 | `AI_BASE_URL` | 留空即 `https://api.deepseek.com` | 選配（換供應商才填） |
 | `AI_CHAT_MODEL` | 留空即 `deepseek-v4-flash` | 選配 |
@@ -150,9 +151,38 @@ Console 沒有「Link LINE account」按鈕，路徑是：右上頭像 → 帳�
 
 ---
 
+## 5.2 新增管理員（查庫＋訂單通知）
+
+本專案**沒有**後台帳號表。能不能管理，只看 Railway 變數 `ADMIN_LINE_USER_IDS` 是否包含對方的 Messaging API `userId`。LINE Developers 的 Admin／Tester 角色**不能**代替這一步（那只影響 Login Channel 還是 Developing 時誰能開 LIFF）。
+
+對**每一位**新管理員，一次做完：
+
+| 步驟 | 位置路徑 → 要求值 | 漏掉的後果 |
+|---|---|---|
+| 1. 加入官方帳號 | 對方用自己的 LINE 把「我的自然生活」加為好友 | Bot 無法 1:1 回覆、也無法 Push 通知給他 |
+| 2. 取得 userId | 對方在**一對一**聊天傳 `我的ID`（或 `/id`） | 沒有正確 ID 就無法列入變數。**不要把 ID 貼進這個對話**，由你在 Railway 填 |
+| 3. 寫入變數 | Railway → 專案 Line Reservation → 服務 `web` → Variables → `ADMIN_LINE_USER_IDS` | 格式：`U` 開頭再加 32 位英數，多位用**英文逗號**串接，例如 `Uaaaa…,Ubbbb…`。可有空白，程式會 trim。格式不符的段會被忽略 |
+| 4. 讓變數生效 | 儲存變數後等服務重部署（Railway 改變數通常會自動 redeploy） | 舊行程仍用舊名單，新管理員問統計仍當一般客人 |
+| 5. （可選）本機 | 若你本機也要測，同步改 `.env.local` 的同一變數後重開 `npm run dev` | 本機與線上名單不一致 |
+| 6. （僅當 Login 仍是 Developing） | LINE Developers → Login Channel → Roles 把對方加為 Tester，且對方 Business ID 已綁該 LINE | 他可以查庫，但可能仍打不開訂購表單（`FORBIDDEN`）。正式給客人用應 Published，此步就不需要 |
+
+格式規則：不是 Channel ID、不是 LIFF ID、不是電話或 LINE 顯示名稱。群組裡的 userId 有時看得到，但仍以加好友後的 1:1「我的ID」為準。
+
+新管理員生效後具備與現有管理員相同的能力：
+
+- 1:1 用自然語言查訂購總量、客排名、訂單列表
+- 收到新訂單、客人取消、客人更改的 Push
+- 自己也可以當客人訂購／取消／改自己的單（查庫與改自己的單互不衝突）
+
+驗證：新管理員在 1:1 傳「本月訂購總量，原味辣味分開」→ 應收到統計。用**尚未列入名單**的帳號傳同一句 → 應走一般客服，不得出現銷售數字。
+
+移除管理員：從 `ADMIN_LINE_USER_IDS` 刪掉該段 userId 並重新部署即可。
+
+---
+
 ## 6. 驗證步驟（每次改設定後跑一次）
 
-1. `https://web-production-1ee6b.up.railway.app/api/health` → 各項旗標皆為 `true`。
+1. `https://web-production-1ee6b.up.railway.app/api/health` → 金鑰旗標為 `true`；`databaseOk` 為軟性探活（false 時服務仍算健康，但改單／訂購會失敗）。
 2. LINE Console 按 **Verify** → 成功。
 3. 1:1 傳任意文字 → Bot 有回覆。
 4. 1:1 傳「我的ID」 → 回傳 `U…`。

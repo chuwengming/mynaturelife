@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { toDateOnlyUtc } from "@/lib/order/dates";
 import { formatReasons, validateOrder, type OrderInput } from "@/lib/order/validate";
@@ -109,19 +109,23 @@ export async function POST(request: NextRequest) {
     });
   });
 
-  await notifyOrderConfirmed({
-    lineUserId: identity.lineUserId,
-    name: input.name,
-    phone: input.phone,
-    orderDate: input.orderDate,
-    orderItem: input.orderItem,
-    plainQty: input.plainQty,
-    spicyQty: input.spicyQty,
-    address: input.address,
-    notes: input.notes,
-    sourceType: source.sourceType,
-    sourceId: source.sourceId,
-  });
+  after(() =>
+    notifyOrderConfirmed({
+      lineUserId: identity.lineUserId,
+      name: input.name,
+      phone: input.phone,
+      orderDate: input.orderDate,
+      orderItem: input.orderItem,
+      plainQty: input.plainQty,
+      spicyQty: input.spicyQty,
+      address: input.address,
+      notes: input.notes,
+      sourceType: source.sourceType,
+      sourceId: source.sourceId,
+    }).catch((error) => {
+      console.error("order notify failed after commit", { orderId: order.id, error });
+    }),
+  );
 
   return NextResponse.json({
     ok: true,

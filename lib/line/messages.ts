@@ -8,9 +8,13 @@ export async function replyMessages(
   await getLineClient().replyMessage({ replyToken, messages });
 }
 
+export async function pushMessages(
+  to: string,
+  messages: messagingApi.Message[],
+): Promise<void> {
+  await getLineClient().pushMessage({ to, messages });
+}
+
 export async function pushText(to: string, text: string): Promise<void> {
-  await getLineClient().pushMessage({
-    to,
-    messages: [{ type: "text", text }],
-  });
+  await pushMessages(to, [{ type: "text", text }]);
 }

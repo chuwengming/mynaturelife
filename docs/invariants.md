@@ -1,7 +1,7 @@
 # Project Invariants（可執行全局契約）
 
 > 隨專案演進持續累積。每條應可被人工或 agent 驗證（可檢查、可回歸）。
-> 最後更新：2026-08-19（Phase 4：管理員自然語言查庫、客人取消／改單）
+> 最後更新：2026-08-20（stage-verifier 1–12 優化落地）
 
 ## 1. 產品流程
 
@@ -9,7 +9,7 @@
 - [x] 全站對外用語為「訂購／訂單」，不再使用「預約」。表單標題為「訂購表單」。
 - [x] 訂單只經 LIFF 頁 `app/liff/booking/page.tsx` 送出；**通過驗證即成立**（`status = confirmed`）。聊天室不直接寫入訂單列。
 - [x] 群組或 1:1 文字訊息由 AI 分類為 `order` / `product` / `smalltalk` / `cancel` / `amend`（`lib/ai/classify.ts`）。`order` 回訂購按鈕；`product` 依 FAQ 回答；`cancel`／`amend` 走對話改單流程；`smalltalk` 溫暖回應並計入閒聊輪數。
-- [x] 訊息含明確「新訂購」關鍵字時直接判為 `order`。含「取消訂購／取消訂單」判為 `cancel`；含「更改／修改訂購」判為 `amend`。取消與更改**優先於**「訂購」關鍵字，不得誤開新表單。
+- [x] 訊息含明確「新訂購」關鍵字（訂購／下單／購買／我要買／預約，以及整句「訂單」或「我要訂單」）時直接判為 `order`。含「取消訂購／取消訂單」判為 `cancel`；含「更改／修改訂購」判為 `amend`。`我的訂單`、`查訂單`、`訂單到了沒` 視為查詢，**不得**開新表單。取消與更改與查詢**優先於**開表單詞。
 - [x] **新建**訂單只經 LIFF `POST /api/orders`。聊天室不得新建訂單列。
 - [x] **取消／更改**可經 1:1 或群組聊天，但只能改「該則訊息發送者」自己的訂單（`orders.line_user_id === event.source.userId`）。取消改 `status=cancelled`（不刪列）；更改通過與新建相同的欄位驗證後才寫入。流程：列出並確認該使用者訂單 → 詢問要改什麼 → 寫入後回覆新內容。進行中可說「算了／不用了」中止。
 - [x] 純聊天最多 `SMALLTALK_TURN_LIMIT = 6` 輪；問產品與問訂購**不計入**。第 6 輪送出固定收尾訊息（理由為要照顧其他客人），並記 `closed_at`。
@@ -22,26 +22,27 @@
 - [x] 多使用者並行：每筆訂單綁 `line_user_id`，不得使用「目前使用者」全域變數。
 - [x] LIFF 送出時後端須驗證 LINE ID Token，不得信任表單自填的 userId。`POST /api/orders` 為唯一寫入點（舊 `POST /api/bookings` 已移除），成功列 `status = confirmed`。
 - [x] 意圖分類由 AI 執行（Phase 3 起）；AI 不可用時退回關鍵字啟發式，不得因此完全不回覆。
-- [x] Webhook 觸發表單的關鍵字：`訂購`、`訂單`、`下單`、`購買`、`我要買`，並保留 `預約` 作相容關鍵字（舊訊息／舊按鈕仍可用）。
-- [x] 對話狀態以對話為單位：1:1 用 `userId`、群組用 `groupId`、多人聊天室用 `roomId`（`conversations.conversation_key`），不以個人為單位計算群組閒聊輪數。
+- [x] Webhook 觸發表單的關鍵字：`訂購`、`下單`、`購買`、`我要買`，並保留 `預約`；整句「訂單」或「我要訂單」仍開表單。`我的訂單`／`查訂單` 不開表單。
+- [x] 對話狀態以對話為單位：1:1 用 `userId`、群組用 `groupId`、多人聊天室用 `roomId`（`conversations.conversation_key`），不以個人為單位計算群組閒聊輪數。群組／聊天室的取消／改單 `flow_json` 必須帶 `speakerId`；非主人的回覆不得當成選號或確定，也不得清掉主人流程。
+- [x] 「我的ID」只在 1:1 回傳 userId；群組／聊天室改口請到一對一查詢。
 - [x] **管理員查庫**僅在 1:1、且 `event.source.userId` 屬於 `ADMIN_LINE_USER_IDS` 時執行。群組內即使管理員發言也不得輸出銷售報表。非管理員講同樣的話當一般客服處理，不得查庫。
-- [x] 管理員自然語言不得變成任意 SQL。AI 只能產出允許的工具參數（期間、筆數、狀態、姓名關鍵字）；實際查詢由 `lib/admin/query.ts` 以 Prisma 執行。預設只統計 `status=confirmed`（含已更改未取消）。
+- [x] 管理員自然語言不得變成任意 SQL。AI 只能產出允許的工具參數（期間、筆數、狀態、姓名關鍵字）；實際查詢由 `lib/admin/query.ts` 以 Prisma 執行。預設只統計 `status=confirmed`（含已更改未取消）。啟發式不得把「幾罐」當成全店統計；不像報表的句子不呼叫分類模型。
 
 ## 3. 環境與銜接（mock / simulation / real）
 
 - [x] 外部後台（LINE／Railway）所有必要設定集中於 `docs/setup-checklist.md`，為設定的權威來源；新發現的設定項或錯誤成因須同輪補入。
 
-- [x] Messaging API 金鑰：`LINE_CHANNEL_SECRET`、`LINE_CHANNEL_ACCESS_TOKEN`。LIFF 另需 **LINE Login** Channel：`LINE_LOGIN_CHANNEL_ID`、`LINE_LOGIN_CHANNEL_SECRET`。兩組不可混用。禁止寫死在 repo。
+- [x] Messaging API 金鑰：`LINE_CHANNEL_SECRET`、`LINE_CHANNEL_ACCESS_TOKEN`。LIFF 另需 **LINE Login** Channel：`LINE_LOGIN_CHANNEL_ID`（驗 ID Token 必填）。`LINE_LOGIN_CHANNEL_SECRET` 可存但不參與目前的 ID Token 驗證。兩組 Channel 不可混用。禁止寫死在 repo。
 - [x] `NEXT_PUBLIC_LINE_LIFF_ID` 來自 Login（或已啟用 Login 的）Channel → LIFF 分頁建立 App 後顯示的 LIFF ID。
 - [x] `ADMIN_LINE_USER_IDS` 是管理員的 Messaging API `userId`（`U` 開頭），不是 Channel ID；Phase 1 在 1:1 傳「我的ID」可查詢。
 - [x] Webhook 路徑固定：`POST /api/line/webhook`。正式 URL：`https://web-production-1ee6b.up.railway.app/api/line/webhook`。
 - [x] LIFF Endpoint 路徑固定：`/liff/booking`（使用者已確認保留）。正式 URL：`https://web-production-1ee6b.up.railway.app/liff/booking`。**即使功能改名為訂購也不得更動此路徑**，否則 LINE Console 的 LIFF Endpoint 需重設並會出現 `INVALID_CONFIG`。
 - [x] AI 供應商走 **OpenAI 相容協定**，只用三個變數決定：`DEEPSEEK_API_KEY`（或 `AI_API_KEY`）、`AI_BASE_URL`（預設 `https://api.deepseek.com`）、`AI_CHAT_MODEL`／`AI_CLASSIFY_MODEL`（預設 `deepseek-v4-flash`）。換供應商不得改動 `lib/ai/` 以外的程式。
 - [x] 沒有 AI key 時服務仍須正常啟動：訂購與表單完全不受影響，聊天改回固定文案。
-- [x] 呼叫 `/chat/completions` 一律帶 `thinking: {type:"disabled"}`。DeepSeek V4 預設開啟思考模式，思考 token 會吃掉 `max_tokens`，導致 `content` 回空字串（實測分類用 40 token 時必然為空）。
+- [x] 呼叫 `/chat/completions` 一律帶 `thinking: {type:"disabled"}`。`/responses` 先帶同等欄位；若 API 回 400 再重試不帶 thinking。空內容必須立刻 fallback，不得空等。
 - [x] 使用 `response_format: json_object` 時提示詞必須包含「json」字樣，否則 DeepSeek 回 400 `invalid_request_error`。
 - [x] **本店資訊**的唯一事實來源是 `docs/faq.md`；標示 `TODO` 的項目視為無資料，AI 必須改口說請專人回覆，不得自行推測價格、成分、運費、出貨。
-- [x] 網路搜尋只用於**與本店規格無關的一般知識**（吃法、料理、食材常識），且回覆須讓客人知道那是一般資訊。搜尋結果**不得**用來回答本店價格、運費、罐重、成分、保存期限、付款與出貨。
+- [x] 網路搜尋只用於**與本店規格無關的一般知識**（吃法、料理、食材常識），且回覆須讓客人知道那是一般資訊。價格／成分／保存／重量等規格題**不得**呼叫 `/responses` 搜尋。搜尋結果**不得**用來回答本店價格、運費、罐重、成分、保存期限、付款與出貨。
 - [x] 搜尋走 DeepSeek `/responses` 端點的伺服器端 `web_search`（`lib/ai/responses.ts`），共用同一把 `DEEPSEEK_API_KEY`，不再引入第三方搜尋服務金鑰。`/chat/completions` 沒有此工具。
 - [x] `/responses` 失敗（400／逾時／模型不支援）時必須自動退回只讀 FAQ 的 `/chat/completions`，不得因搜尋失敗就不回覆。`AI_WEB_SEARCH=off` 可關閉搜尋。
 - [x] **廢棄**：舊計畫「Phase 4 建 LLM-Wiki 知識庫並經 `retrieve(question)` 取用」→ 新做法「不另建知識庫，`docs/faq.md` 加網路搜尋即可」。不得再為此新增知識庫服務或 `retrieve` 介面。
@@ -51,7 +52,7 @@
 
 - [x] Railway MySQL 為訂單與 webhook 去重的權威來源。
 - [x] `processed_events.webhook_event_id` 唯一；同一事件重送不得重複 Reply／重複開 AI。
-- [x] 對話狀態表 `conversations`（閒聊輪數、最後意圖、收尾時間、`flow_json` 取消／改單進行中狀態）與歷史表 `chat_messages`。資料庫不可用時聊天仍要能回覆，只是不累計輪數、也不能改單。
+- [x] 對話狀態表 `conversations`（閒聊輪數、最後意圖、收尾時間、`flow_json` 含 `speakerId` 的取消／改單狀態）與歷史表 `chat_messages`。`processed_events` 保留 7 天、`chat_messages` 保留 30 天後可刪，不得改變 `webhook_event_id` 唯一語意。資料庫不可用時聊天仍要能回覆，只是不累計輪數、也不能改單。
 - [x] 單價用於銷售金額試算：每罐 280 元（與 `docs/faq.md` 同步，常數 `PRICE_PER_JAR`）。運費不計入。
 - [x] 訂單資料表為 `orders`（舊 `bookings` 由遷移 `20260819110000_bookings_to_orders` 更名，欄位 `booking_date`→`order_date`、`booking_item`→`order_item`，刪 `booking_slot`，新增 `plain_qty`、`spicy_qty`、`address`）。不得再新增 `bookings` 相關程式路徑。
 - [x] 訂購欄位（v2）：姓名、聯絡電話、訂購日期、訂購項目、原味數量、辣味數量、地址、備註（選填）。**無時段欄位**。
@@ -72,7 +73,10 @@
 - [x] 未通過 `X-Line-Signature`（HMAC-SHA256、raw body）不得處理事件；失敗回 401。
 - [x] 驗簽後業務／AI 失敗仍回 HTTP 200，避免 LINE 重送同一事件。
 - [x] Webhook 必須在約 1 秒內回 200；慢工作（AI、Wiki、搜尋）不得擋在 200 之前。實作方式：驗簽後用 `after()`（`next/server`）在回應之後才跑 `handleWebhookEvents`。
-- [x] AI 回覆可能超過 Reply Token 時效，`respond()` 失敗時必須改用 Push 到同一對話，不得默默丟失回覆。
+- [x] AI 回覆可能超過 Reply Token 時效，`respond()` 失敗時必須把**同一組** Message（含訂購按鈕 template）改用 Push，不得只補文字。
+- [x] `handleWebhookEvents` 每一則事件的 claim 與處理都包在獨立 try；一則失敗不得讓同批其餘事件消失。HTTP 仍須先 200。
+- [x] `POST /api/orders` 交易成功後先回 LIFF JSON，LINE 通知用 `after()`，不得把 Push 擋在成功回應之前。
+- [x] `/api/health` 的 `ok` 不因 MySQL ping 失敗而變 false（避免 migrate 期間被 Railway 重啟）；另給軟性旗標 `databaseOk`。
 - [x] AI 客服語氣契約：客氣、耐心、繁體中文、單次 3 句／約 120 字內、不得催促、不得宣稱療效、不得在聊天室索取姓名電話地址（一律導向表單）。
 - [x] Reply Token 一次性；長回答改用 Push Message。群組互動 Push 到 groupId，不要只推給個人。
 - [x] 不得把 Channel Secret／Access Token 打進前端 bundle。

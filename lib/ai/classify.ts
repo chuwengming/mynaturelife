@@ -4,6 +4,7 @@ import {
   mentionsAmend,
   mentionsCancel,
   mentionsNewOrder,
+  mentionsOrderQuery,
   mentionsProduct,
 } from "@/lib/chat/keywords";
 
@@ -13,8 +14,8 @@ const SYSTEM = `你是台灣手工豆腐乳賣家「我的自然生活」的訊�
 把客人這句話分成五類之一：
 cancel：要取消已成立的訂單。
 amend：要更改已成立訂單的數量、地址、日期、電話等。
-order：想要新訂購、下單、買、詢問怎麼買。不是取消也不是更改。
-product：在問產品或交易資訊（成分、口味、價格、運費、宅配、保存方式、出貨時間）。
+order：想要新訂購、下單、買、詢問怎麼買、或只要開訂購表單。不是取消、更改，也不是查已成立訂單進度。
+product：在問產品或交易資訊（成分、口味、價格、運費、宅配、保存方式、出貨時間），或「我的訂單到了沒／查訂單進度」。
 smalltalk：寒暄、閒聊、天氣、心情、與產品和訂購無關的話題。
 只輸出 json 物件：{"intent":"cancel|amend|order|product|smalltalk"}。不要任何說明文字。`;
 
@@ -27,6 +28,9 @@ function heuristicIntent(text: string): Intent {
   }
   if (mentionsNewOrder(text)) {
     return "order";
+  }
+  if (mentionsOrderQuery(text)) {
+    return "product";
   }
   if (mentionsProduct(text)) {
     return "product";
@@ -64,6 +68,9 @@ export async function classifyIntent(
   }
   if (mentionsNewOrder(text)) {
     return "order";
+  }
+  if (mentionsOrderQuery(text)) {
+    return "product";
   }
   if (!isAiEnabled()) {
     return heuristicIntent(text);

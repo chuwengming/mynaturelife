@@ -3,6 +3,7 @@ import { getChatModel, isAiEnabled, isWebSearchEnabled } from "@/lib/ai/env";
 import { loadFaq } from "@/lib/ai/faq";
 import { productSystemPrompt, smalltalkSystemPrompt } from "@/lib/ai/persona";
 import { answerWithWebSearch } from "@/lib/ai/responses";
+import { isGeneralKnowledgeQuestion, isShopSpecQuestion } from "@/lib/chat/keywords";
 import { AI_UNAVAILABLE_MESSAGE, SMALLTALK_TURN_LIMIT } from "@/lib/chat/policy";
 
 const MAX_REPLY_CHARS = 220;
@@ -27,7 +28,7 @@ async function generate(system: string, history: AiMessage[], text: string): Pro
   return trimReply(raw);
 }
 
-/** 先試帶網路搜尋的 /responses；失敗就退回只讀 FAQ 的 /chat/completions。 */
+/** 規格題只走 FAQ；一般知識才走 /responses 搜尋，失敗再退回 FAQ。 */
 export async function answerProductQuestion(
   text: string,
   history: AiMessage[],
@@ -37,8 +38,10 @@ export async function answerProductQuestion(
   }
 
   const faq = await loadFaq();
+  const allowSearch =
+    isWebSearchEnabled() && isGeneralKnowledgeQuestion(text) && !isShopSpecQuestion(text);
 
-  if (isWebSearchEnabled()) {
+  if (allowSearch) {
     try {
       const answer = await answerWithWebSearch({
         model: getChatModel(),

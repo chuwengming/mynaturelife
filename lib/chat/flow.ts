@@ -1,4 +1,6 @@
-export type OrderFlow =
+export type OrderFlow = {
+  speakerId: string;
+} & (
   | { kind: "cancel" | "amend"; step: "pick"; orderIds: string[] }
   | { kind: "cancel"; step: "confirm"; orderId: string }
   | { kind: "amend"; step: "change"; orderId: string }
@@ -7,7 +9,8 @@ export type OrderFlow =
       step: "confirm";
       orderId: string;
       patch: Record<string, unknown>;
-    };
+    }
+);
 
 export function parseFlowJson(raw: string | null | undefined): OrderFlow | null {
   if (!raw) {
@@ -16,6 +19,9 @@ export function parseFlowJson(raw: string | null | undefined): OrderFlow | null 
   try {
     const data = JSON.parse(raw) as OrderFlow;
     if (data.kind !== "cancel" && data.kind !== "amend") {
+      return null;
+    }
+    if (!data.speakerId) {
       return null;
     }
     return data;

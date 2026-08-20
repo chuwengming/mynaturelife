@@ -5,7 +5,7 @@ export const ORDER_ITEMS = [
 
 export type OrderItemValue = (typeof ORDER_ITEMS)[number]["value"];
 
-/** 6 罐以上可宅配，此時地址為必填。 */
+/** 6 罐以上可以宅配（運費另計）。地址一律選填，缺地址不得拒絕訂單。 */
 export const DELIVERY_MIN_QTY = 6;
 
 export const MAX_QTY_PER_FLAVOR = 999;

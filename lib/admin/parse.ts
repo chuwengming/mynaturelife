@@ -2,7 +2,7 @@ import { chatComplete } from "@/lib/ai/client";
 import { getClassifyModel, isAiEnabled } from "@/lib/ai/env";
 import type { AdminTool } from "@/lib/admin/query";
 import type { PeriodName } from "@/lib/order/period";
-import { mentionsAmend, mentionsCancel, mentionsNewOrder } from "@/lib/chat/keywords";
+import { looksLikeAdminReport, mentionsAmend, mentionsCancel, mentionsNewOrder } from "@/lib/chat/keywords";
 
 const SYSTEM = `你是豆腐乳店後台的查詢翻譯器。把管理員的中文轉成 json 物件，不要說明文字。
 欄位：
@@ -57,7 +57,7 @@ function heuristicAdmin(text: string): AdminTool | { action: "not_admin" } {
   }
   const wantsList = /列出|清單|有哪些訂單|訂單列表/.test(text);
   const wantsTop = /哪一|哪位|最大|最多|排名|採購量/.test(text);
-  const wantsTotal = /總量|總共|銷售|統計|多少罐|幾罐/.test(text);
+  const wantsTotal = /總量|總共|銷售|統計|報表/.test(text);
   let period: PeriodName = "this_month";
   if (text.includes("上週") || text.includes("上周")) {
     period = "last_week";
@@ -89,6 +89,9 @@ export async function parseAdminQuery(
 ): Promise<AdminTool | { action: "not_admin" }> {
   const fallback = heuristicAdmin(text);
   if (!isAiEnabled()) {
+    return fallback;
+  }
+  if (fallback.action === "not_admin" && !looksLikeAdminReport(text)) {
     return fallback;
   }
   try {
